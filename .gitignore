@@ -1,0 +1,25 @@
+# 本地配置（含 API 密钥），不入库
+.env
+
+# 日志
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# 构建产物 / 下载的模型
+llama.cpp/
+model-gguf/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.python-header.yaml
