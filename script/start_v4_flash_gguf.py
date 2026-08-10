@@ -174,9 +174,7 @@ def _find_first(destination: Path, patterns: list[str]) -> Path | None:
     return None
 
 
-def download_gguf(
-    modelscope_id: str, model_root: Path, quant: str, want_dspark: bool
-) -> tuple[Path, Path | None]:
+def download_gguf(modelscope_id: str, model_root: Path, quant: str, want_dspark: bool) -> tuple[Path, Path | None]:
     """Download only the given quant's shards (plus the DSpark drafter if wanted).
 
     Returns (model_first_shard, draft_path_or_None). Never downloads the whole repo.
@@ -209,14 +207,9 @@ def download_gguf(
 
     # ModelScope preserves the repository's <quant>/ subdirectory, so the
     # shards are not necessarily directly under ``destination``.
-    model_match = _find_first(
-        destination, [f"*{quant}*-00001-of-*.gguf", f"*{quant}*.gguf"]
-    )
+    model_match = _find_first(destination, [f"*{quant}*-00001-of-*.gguf", f"*{quant}*.gguf"])
     if model_match is None:
-        raise SystemExit(
-            f"下载结束，但未找到 {quant} 的首分片：{destination}\n"
-            "请检查 ModelScope 仓库中的实际量化名称；脚本没有下载官方 safetensors 权重。"
-        )
+        raise SystemExit(f"下载结束，但未找到 {quant} 的首分片：{destination}\n" "请检查 ModelScope 仓库中的实际量化名称；脚本没有下载官方 safetensors 权重。")
 
     draft_match = None
     if want_dspark:
@@ -239,76 +232,65 @@ def main() -> None:
     if env_file.is_file():
         print(f"已加载配置：{env_file}", flush=True)
 
-    parser = argparse.ArgumentParser(
-        description="在 CUDA/Ada GPU 上启动 DeepSeek-V4-Flash GGUF 的 OpenAI 兼容服务（官方 llama.cpp + DSpark）。"
+    parser = argparse.ArgumentParser(description="在 CUDA/Ada GPU 上启动 DeepSeek-V4-Flash GGUF 的 OpenAI 兼容服务（官方 llama.cpp + DSpark）。")
+    parser.add_argument("--model", type=Path, default=env("MODEL"), help="V4-aware GGUF 的第一个分片，例如 ...-00001-of-00005.gguf（.env: MODEL）")
+    parser.add_argument(
+        "--draft", type=Path, default=(env("DRAFT") or None), help="DSpark 草稿 GGUF（dspark-DeepSeek-V4-Flash-0731-Q8_0.gguf）。" "不指定时脚本会自动在模型同目录及各级上级目录中查找 dspark*.gguf。"
     )
-    parser.add_argument("--model", type=Path, default=env("MODEL"),
-                        help="V4-aware GGUF 的第一个分片，例如 ...-00001-of-00005.gguf（.env: MODEL）")
-    parser.add_argument("--draft", type=Path, default=(env("DRAFT") or None),
-                        help="DSpark 草稿 GGUF（dspark-DeepSeek-V4-Flash-0731-Q8_0.gguf）。"
-                             "不指定时脚本会自动在模型同目录及各级上级目录中查找 dspark*.gguf。")
-    parser.add_argument("--download", action="store_true",
-                        help="从 ModelScope 下载指定量化版本的 GGUF；只下载该量化版本的分片")
-    parser.add_argument("--quant", default=env("QUANT", "UD-Q8_K_XL"),
-                        help="要下载的量化版本目录名，例如 UD-Q8_K_XL（默认，无损）、UD-Q4_K_XL（近无损），"
-                             "对应 ModelScope 仓库里的子目录名，仅在 --download 时生效")
-    parser.add_argument("--modelscope-id", default=env("MODELSCOPE_ID", DEFAULT_MODELSCOPE_ID),
-                        help="ModelScope GGUF 仓库 ID")
-    parser.add_argument("--model-root", type=Path,
-                        default=(Path(env("MODEL_ROOT")) if env("MODEL_ROOT")
-                                 else PROJECT_ROOT.parent.parent / "model-gguf"),
-                        help="--download 时 GGUF 的保存父目录（默认 <项目根>/../../model-gguf）")
-    parser.add_argument("--source-dir", type=Path,
-                        default=(Path(env("SOURCE_DIR")) if env("SOURCE_DIR")
-                                 else PROJECT_ROOT.parent / "llama.cpp"),
-                        help="官方 llama.cpp 源码目录（默认 <项目根>/../llama.cpp）")
+    parser.add_argument("--download", action="store_true", help="从 ModelScope 下载指定量化版本的 GGUF；只下载该量化版本的分片")
+    parser.add_argument(
+        "--quant", default=env("QUANT", "UD-Q8_K_XL"), help="要下载的量化版本目录名，例如 UD-Q8_K_XL（默认，无损）、UD-Q4_K_XL（近无损），" "对应 ModelScope 仓库里的子目录名，仅在 --download 时生效"
+    )
+    parser.add_argument("--modelscope-id", default=env("MODELSCOPE_ID", DEFAULT_MODELSCOPE_ID), help="ModelScope GGUF 仓库 ID")
+    parser.add_argument(
+        "--model-root",
+        type=Path,
+        default=(Path(env("MODEL_ROOT")) if env("MODEL_ROOT") else PROJECT_ROOT.parent.parent / "model-gguf"),
+        help="--download 时 GGUF 的保存父目录（默认 <项目根>/../../model-gguf）",
+    )
+    parser.add_argument(
+        "--source-dir", type=Path, default=(Path(env("SOURCE_DIR")) if env("SOURCE_DIR") else PROJECT_ROOT.parent / "llama.cpp"), help="官方 llama.cpp 源码目录（默认 <项目根>/../llama.cpp）"
+    )
     parser.add_argument("--port", type=int, default=int(env("PORT", "18888")))
-    parser.add_argument("--api-key", type=str, default=(env("API_KEY") or None),
-                        help="llama-server 的 API 密钥。设置后所有请求需带 "
-                             "Authorization: Bearer <key>；不设置则不校验。")
+    parser.add_argument("--api-key", type=str, default=(env("API_KEY") or None), help="llama-server 的 API 密钥。设置后所有请求需带 " "Authorization: Bearer <key>；不设置则不校验。")
     # --ctx-size 不设固定默认值：命令行显式传入优先，其次 .env 的 CTX_SIZE，
     # 均未指定时按 CTX_PER_SLOT × --parallel 自动计算（每个并发 1M 上下文）。
-    parser.add_argument("--ctx-size", type=int, default=argparse.SUPPRESS,
-                        help="总上下文长度。默认按并发数自动计算：PARALLEL × 1048576"
-                             "（每个并发槽位 1M 上下文）；可用命令行或 .env 的 CTX_SIZE 覆盖。")
-    parser.add_argument("--parallel", type=int, default=int(env("PARALLEL", "2")),
-                        help="并发序列数，默认 2。若在官方版上出现并行崩溃，用 --parallel 1 回退。")
+    parser.add_argument(
+        "--ctx-size", type=int, default=argparse.SUPPRESS, help="总上下文长度。默认按并发数自动计算：PARALLEL × 1048576" "（每个并发槽位 1M 上下文）；可用命令行或 .env 的 CTX_SIZE 覆盖。"
+    )
+    parser.add_argument("--parallel", type=int, default=int(env("PARALLEL", "2")), help="并发序列数，默认 2。若在官方版上出现并行崩溃，用 --parallel 1 回退。")
     parser.add_argument("--gpu-count", type=int, default=int(env("GPU_COUNT", "8")))
     parser.add_argument("--build-only", action="store_true")
     parser.add_argument("--skip-build", action="store_true")
-    parser.add_argument("--reasoning", default=env("REASONING", "on"), choices=["on", "off"],
-                        help="是否开启推理/思考模式，默认 on")
-    parser.add_argument("--reasoning-format", default=env("REASONING_FORMAT", "deepseek"),
-                        help="推理内容的输出格式，默认 deepseek")
-    parser.add_argument("--fit", default=env("FIT", "off"),
-                        help="传给 llama-server 的 --fit 参数，默认 off（DSpark README 推荐）。"
-                             "--fit on 时 llama-server 无法为草稿模型单独测量显存、跳过预留，"
-                             "草稿 ~11GB 会落在预算外，显存紧张时可能 OOM。传 on 开启。")
-    parser.add_argument("--cache-type-k", default=env("CACHE_TYPE_K", "q8_0"),
-                        help="KV cache K 量化类型，默认 q8_0。已在官方 b10298 上验证正常输出；"
-                             "如需保守用 f16 传 --cache-type-k f16，禁用传空串 \"\"。")
-    parser.add_argument("--cache-type-v", default=env("CACHE_TYPE_V", "q8_0"),
-                        help="KV cache V 量化类型，默认 q8_0。同上。")
-    parser.add_argument("--no-dspark", action="store_true", default=not _env_bool("DSPARK", True),
-                        help="禁用 DSpark 投机解码（不加载草稿模型、不加 spec 参数）。"
-                             "默认由 .env 的 DSPARK 控制（on=启用）。")
-    parser.add_argument("--spec-type", default=env("SPEC_TYPE", "draft-dspark"),
-                        help="投机解码类型，默认 draft-dspark")
-    parser.add_argument("--spec-draft-n-max", type=int, default=int(env("SPEC_DRAFT_N_MAX", "3")),
-                        help="DSpark 最大草稿 token 数，默认 3（Unsloth 推荐，更大反而更慢）")
-    parser.add_argument("--n-gpu-layers-draft", type=int, default=int(env("N_GPU_LAYERS_DRAFT", "999")),
-                        help="草稿模型 GPU 层数，默认 999")
-    parser.add_argument("--log-dir", type=Path,
-                        default=(Path(env("LOG_DIR")) if env("LOG_DIR")
-                                 else PROJECT_ROOT.parent.parent / "logs"),
-                        help="服务器日志文件的保存目录（默认 <项目根>/../../logs）")
-    parser.add_argument("--log-file", type=Path, default=None,
-                        help="服务器日志文件的完整路径。若不指定，则在 --log-dir 下"
-                             "自动生成 llama-server-<port>-<时间戳>.log")
-    parser.add_argument("--no-console", action="store_true",
-                        help="只写日志文件，不在终端打印输出（默认终端和文件同时输出）")
-    parser.add_argument("--no-log-append", action="store_true",
-                        help="覆盖已存在的日志文件，而不是追加写入")
+    parser.add_argument("--reasoning", default=env("REASONING", "on"), choices=["on", "off"], help="是否开启推理/思考模式，默认 on")
+    parser.add_argument("--reasoning-format", default=env("REASONING_FORMAT", "deepseek"), help="推理内容的输出格式，默认 deepseek")
+    parser.add_argument(
+        "--fit",
+        default=env("FIT", "off"),
+        help="传给 llama-server 的 --fit 参数，默认 off（DSpark README 推荐）。"
+        "--fit on 时 llama-server 无法为草稿模型单独测量显存、跳过预留，"
+        "草稿 ~11GB 会落在预算外，显存紧张时可能 OOM。传 on 开启。",
+    )
+    parser.add_argument(
+        "--cache-type-k", default=env("CACHE_TYPE_K", "q8_0"), help="KV cache K 量化类型，默认 q8_0。已在官方 b10298 上验证正常输出；" '如需保守用 f16 传 --cache-type-k f16，禁用传空串 ""。'
+    )
+    parser.add_argument("--cache-type-v", default=env("CACHE_TYPE_V", "q8_0"), help="KV cache V 量化类型，默认 q8_0。同上。")
+    parser.add_argument(
+        "--no-dspark", action="store_true", default=not _env_bool("DSPARK", True), help="禁用 DSpark 投机解码（不加载草稿模型、不加 spec 参数）。" "默认由 .env 的 DSPARK 控制（on=启用）。"
+    )
+    parser.add_argument("--spec-type", default=env("SPEC_TYPE", "draft-dspark"), help="投机解码类型，默认 draft-dspark")
+    parser.add_argument("--spec-draft-n-max", type=int, default=int(env("SPEC_DRAFT_N_MAX", "3")), help="DSpark 最大草稿 token 数，默认 3（Unsloth 推荐，更大反而更慢）")
+    parser.add_argument(
+        "--repeat-penalty",
+        type=float,
+        default=(float(env("REPEAT_PENALTY")) if env("REPEAT_PENALTY") else None),
+        help="重复惩罚系数，默认不启用（llama-server 默认 1.0）。" "设为 >1.0（如 1.15）可抑制文本重复/复读；" "仅在显式指定时传给 llama-server（.env: REPEAT_PENALTY）",
+    )
+    parser.add_argument("--n-gpu-layers-draft", type=int, default=int(env("N_GPU_LAYERS_DRAFT", "999")), help="草稿模型 GPU 层数，默认 999")
+    parser.add_argument("--log-dir", type=Path, default=(Path(env("LOG_DIR")) if env("LOG_DIR") else PROJECT_ROOT.parent.parent / "logs"), help="服务器日志文件的保存目录（默认 <项目根>/../../logs）")
+    parser.add_argument("--log-file", type=Path, default=None, help="服务器日志文件的完整路径。若不指定，则在 --log-dir 下" "自动生成 llama-server-<port>-<时间戳>.log")
+    parser.add_argument("--no-console", action="store_true", help="只写日志文件，不在终端打印输出（默认终端和文件同时输出）")
+    parser.add_argument("--no-log-append", action="store_true", help="覆盖已存在的日志文件，而不是追加写入")
     args = parser.parse_args()
 
     # --ctx-size 解析：命令行显式传入 > .env 的 CTX_SIZE > 按并发自动计算（每并发 1M）
@@ -319,8 +301,7 @@ def main() -> None:
         else:
             args.ctx_size = args.parallel * CTX_PER_SLOT
             print(
-                f"未指定 --ctx-size，按并发数自动计算：{args.parallel} × {CTX_PER_SLOT}"
-                f" = {args.ctx_size}（每个并发槽位 1M 上下文）",
+                f"未指定 --ctx-size，按并发数自动计算：{args.parallel} × {CTX_PER_SLOT}" f" = {args.ctx_size}（每个并发槽位 1M 上下文）",
                 flush=True,
             )
 
@@ -335,9 +316,7 @@ def main() -> None:
 
     # If the user overrides KV cache quants away from the verified defaults
     # (q8_0/q8_0), point out that q8_0 was the validated setting on this build.
-    if (args.cache_type_k or args.cache_type_v) and (
-        args.cache_type_k != "q8_0" or args.cache_type_v != "q8_0"
-    ):
+    if (args.cache_type_k or args.cache_type_v) and (args.cache_type_k != "q8_0" or args.cache_type_v != "q8_0"):
         print(
             "\n注意：你改动了 KV cache 量化类型 "
             f"(K={args.cache_type_k or 'f16'}, V={args.cache_type_v or 'f16'})。"
@@ -350,20 +329,14 @@ def main() -> None:
     draft_path: Path | None = args.draft
 
     if args.download:
-        model_path, auto_draft = download_gguf(
-            args.modelscope_id, args.model_root.expanduser().resolve(), args.quant, want_dspark
-        )
+        model_path, auto_draft = download_gguf(args.modelscope_id, args.model_root.expanduser().resolve(), args.quant, want_dspark)
         if draft_path is None:
             draft_path = auto_draft
     else:
         model_path = args.model.expanduser()
 
     if not model_path.is_file():
-        raise SystemExit(
-            f"找不到 GGUF 模型：{model_path}\n"
-            "请先下载 V4 专用 GGUF（例如 Unsloth 的 0731 Q4_K_XL），"
-            "并把 --model 指向 -00001-of-0000N.gguf。"
-        )
+        raise SystemExit(f"找不到 GGUF 模型：{model_path}\n" "请先下载 V4 专用 GGUF（例如 Unsloth 的 0731 Q4_K_XL），" "并把 --model 指向 -00001-of-0000N.gguf。")
 
     if want_dspark and draft_path is None and not args.download:
         # Auto-discover a dspark drafter: first next to the model, then in each
@@ -410,10 +383,17 @@ def main() -> None:
         raise SystemExit(f"{source} 已存在但不是 Git 仓库；不会覆盖它。")
 
     if not args.skip_build:
-        run([
-            "cmake", "-S", str(source), "-B", str(source / "build"),
-            "-DGGML_CUDA=ON", "-DCMAKE_BUILD_TYPE=Release",
-        ])
+        run(
+            [
+                "cmake",
+                "-S",
+                str(source),
+                "-B",
+                str(source / "build"),
+                "-DGGML_CUDA=ON",
+                "-DCMAKE_BUILD_TYPE=Release",
+            ]
+        )
         run(["cmake", "--build", str(source / "build"), "--config", "Release", "-j"])
 
     if args.build_only:
@@ -424,27 +404,45 @@ def main() -> None:
     gpu_split = ",".join(["1"] * args.gpu_count)
     command = [
         str(server),
-        "--model", str(model_path.resolve()),
-        "--host", "0.0.0.0",
-        "--port", str(args.port),
-        "--ctx-size", str(args.ctx_size),
-        "--parallel", str(args.parallel),
-        "--n-gpu-layers", "999",
-        "--split-mode", "layer",
-        "--tensor-split", gpu_split,
+        "--model",
+        str(model_path.resolve()),
+        "--host",
+        "0.0.0.0",
+        "--port",
+        str(args.port),
+        "--ctx-size",
+        str(args.ctx_size),
+        "--parallel",
+        str(args.parallel),
+        "--n-gpu-layers",
+        "999",
+        "--split-mode",
+        "layer",
+        "--tensor-split",
+        gpu_split,
         "--jinja",
-        "--reasoning", args.reasoning,
-        "--reasoning-format", args.reasoning_format,
-        "--flash-attn", "on",
+        "--reasoning",
+        args.reasoning,
+        "--reasoning-format",
+        args.reasoning_format,
+        "--flash-attn",
+        "on",
     ]
     if args.api_key:
         command += ["--api-key", args.api_key]
+    # 重复惩罚：默认不启用（llama-server 默认 1.0），仅在显式指定时透传。
+    if args.repeat_penalty is not None:
+        command += ["--repeat-penalty", str(args.repeat_penalty)]
     if want_dspark and draft_path is not None:
         command += [
-            "--model-draft", str(draft_path),
-            "--spec-type", args.spec_type,
-            "--spec-draft-n-max", str(args.spec_draft_n_max),
-            "--n-gpu-layers-draft", str(args.n_gpu_layers_draft),
+            "--model-draft",
+            str(draft_path),
+            "--spec-type",
+            args.spec_type,
+            "--spec-draft-n-max",
+            str(args.spec_draft_n_max),
+            "--n-gpu-layers-draft",
+            str(args.n_gpu_layers_draft),
         ]
     # --fit defaults to "off" (DSpark README recommendation): with --fit on
     # llama.cpp cannot measure draft memory and skips the reserve, leaving the
@@ -480,9 +478,7 @@ def main() -> None:
     if args.no_console:
         shell_cmd = f"exec {quoted_command} >> {quoted_log_path} 2>&1"
     else:
-        shell_cmd = (
-            f"exec {quoted_command} 2>&1 | tee {tee_flags} {quoted_log_path}"
-        )
+        shell_cmd = f"exec {quoted_command} 2>&1 | tee {tee_flags} {quoted_log_path}"
 
     os.execvp("/bin/sh", ["/bin/sh", "-c", shell_cmd])
 

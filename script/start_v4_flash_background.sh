@@ -39,6 +39,8 @@ CTX_SIZE="${CTX_SIZE:-}"
 PARALLEL="${PARALLEL:-2}"
 # API 密钥（.env 留空则不校验）
 API_KEY="${API_KEY:-root123456}"
+# 重复惩罚系数（.env 留空则不启用，llama-server 默认 1.0；如 1.15 可抑制复读）
+REPEAT_PENALTY="${REPEAT_PENALTY:-}"
 
 LOG_DIR="${LOG_DIR:-$(cd "$PROJECT_ROOT/../.." && pwd)/logs}"
 mkdir -p "$LOG_DIR"
@@ -52,6 +54,9 @@ if [[ -n "$CTX_SIZE" ]]; then
 fi
 if [[ -n "$API_KEY" ]]; then
   ARGS+=(--api-key "$API_KEY")
+fi
+if [[ -n "$REPEAT_PENALTY" ]]; then
+  ARGS+=(--repeat-penalty "$REPEAT_PENALTY")
 fi
 
 nohup python3 "$SCRIPT_DIR/start_v4_flash_gguf.py" "${ARGS[@]}" \
