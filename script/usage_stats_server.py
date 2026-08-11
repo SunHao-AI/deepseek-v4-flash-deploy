@@ -119,3 +119,114 @@ def build_payload(snap: dict, price_in: float, price_out: float, budget: float |
         payload["total"] = None
         payload["remaining"] = None
     return payload
+
+
+class UsageCollector:
+    """后台轮询 llama-server /metrics，维护最近一次用量快照。"""
+
+    def __init__(self, base_url: str, poll_interval: float, api_key: str | None) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.poll_interval = poll_interval
+        self.api_key = api_key
+        self._lock = threading.Lock()
+        self._snapshot = {"ok": False, "error": None, "prompt_total": 0.0, "predicted_total": 0.0, "prompt_rate": 0.0, "predicted_rate": 0.0}
+        self._last = {"time": None, "predicted_total": 0.0}
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=5)
+
+    def _loop(self) -> None:
+        while not self._stop.is_set():
+            self._poll_once()
+            self._stop.wait(self.poll_interval)
+
+    def _poll_once(self) -> None:
+        url = f"{self.base_url}/metrics"
+        try:
+            request = urllib.request.Request(url)
+            if self.api_key:
+                request.add_header("Authorization", f"Bearer {self.api_key}")
+            with urllib.request.urlopen(request, timeout=10) as resp:
+                body = resp.read().decode("utf-8", errors="replace")
+            metrics = parse_metrics(body)
+            now = time.monotonic()
+            rate = metrics["predicted_rate"]
+            if rate <= 0.0 and self._last["time"] is not None:
+                delta_t = now - self._last["time"]
+                delta_tokens = metrics["predicted_total"] - self._last["predicted_total"]
+                if delta_t > 0:
+                    rate = delta_tokens / delta_t
+            with self._lock:
+                self._snapshot = {
+                    "ok": True,
+                    "error": None,
+                    "prompt_total": metrics["prompt_total"],
+                    "predicted_total": metrics["predicted_total"],
+                    "prompt_rate": metrics["prompt_rate"],
+                    "predicted_rate": rate,
+                }
+            self._last = {"time": now, "predicted_total": metrics["predicted_total"]}
+        except Exception as error:  # noqa: BLE001 —— 轮询失败仅记录，不中断服务
+            with self._lock:
+                self._snapshot = {"ok": False, "error": str(error), "prompt_total": 0.0, "predicted_total": 0.0, "prompt_rate": 0.0, "predicted_rate": 0.0}
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            return dict(self._snapshot)
+
+
+class UsageHandler(BaseHTTPRequestHandler):
+    config: dict = {}  # 由 main() 注入 {"collector", "price_in", "price_out", "budget"}
+
+    def do_GET(self) -> None:  # noqa: N802 —— http.server 命名约定
+        if self.path.rstrip("/") == "/api/usage":
+            cfg = self.config
+            payload = build_payload(cfg["collector"].snapshot(), cfg["price_in"], cfg["price_out"], cfg["budget"])
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            self.send_error(404)
+
+    def log_message(self, fmt: str, *args) -> None:  # noqa: A003 —— 抑制默认请求日志
+        pass
+
+
+def main() -> None:
+    load_env()
+    parser = argparse.ArgumentParser(description="cc-switch 用量统计服务（轮询 llama-server /metrics 并暴露 /api/usage）")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("USAGE_PORT", "5002")))
+    parser.add_argument("--llama-base", default=os.environ.get("USAGE_LLAMA_BASE", "http://192.168.77.210:18888"))
+    parser.add_argument("--poll-interval", type=float, default=float(os.environ.get("USAGE_POLL_INTERVAL", "5")))
+    parser.add_argument("--price-in", type=float, default=float(os.environ.get("USAGE_PRICE_IN", "1.0")))
+    parser.add_argument("--price-out", type=float, default=float(os.environ.get("USAGE_PRICE_OUT", "2.0")))
+    parser.add_argument("--budget", type=float, default=(float(os.environ["USAGE_BUDGET"]) if os.environ.get("USAGE_BUDGET") else None))
+    parser.add_argument("--api-key", default=os.environ.get("LLAMA_API_KEY") or None)
+    args = parser.parse_args()
+
+    collector = UsageCollector(args.llama_base, args.poll_interval, args.api_key)
+    collector.start()
+
+    UsageHandler.config = {"collector": collector, "price_in": args.price_in, "price_out": args.price_out, "budget": args.budget}
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), UsageHandler)
+    print(f"cc-switch 用量统计服务运行于 http://127.0.0.1:{args.port}/api/usage（轮询 {args.llama_base}/metrics）", flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        collector.stop()
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()
