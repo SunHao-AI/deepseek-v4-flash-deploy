@@ -113,8 +113,8 @@ cc-switch ──> nginx（监听 :5000，sites-enabled/myflaskapp）
 
 ```nginx
 # ---- 210 LLM 用量统计（cc-switch 用量查询）----
-location ~ ^/210/llm/v1/api/usage$ {
-    proxy_pass http://192.168.77.210:5002/api/usage;
+location ~ ^/210/llm/v1/api/usage(.*)$ {
+    proxy_pass http://192.168.77.210:5002/api/usage$1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
 }

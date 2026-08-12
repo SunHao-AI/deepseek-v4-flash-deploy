@@ -685,14 +685,14 @@ git commit -m "docs: .env.example 新增 cc-switch 用量统计服务配置段"
 - Consumes: Task 1-4 的产物（统计服务、/metrics、.env 配置）
 - Produces: nginx location 与 cc-switch 配置文本
 
-- [ ] **Step 1: nginx 新增精确匹配 location**
+- [ ] **Step 1: nginx 新增用量统计 location**
 
 编辑服务器上 `/etc/nginx/sites-enabled/myflaskapp`，在 `location ~ ^/210/llm/(.*)$` **之前**插入：
 
 ```nginx
     # ---- 210 LLM 用量统计（cc-switch 用量查询）----
-    location ~ ^/210/llm/v1/api/usage$ {
-        proxy_pass http://192.168.77.210:5002/api/usage;
+    location ~ ^/210/llm/v1/api/usage(.*)$ {
+        proxy_pass http://192.168.77.210:5002/api/usage$1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
