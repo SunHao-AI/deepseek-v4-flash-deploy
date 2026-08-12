@@ -427,6 +427,7 @@ def main() -> None:
         args.reasoning_format,
         "--flash-attn",
         "on",
+        "--metrics",
     ]
     if args.api_key:
         command += ["--api-key", args.api_key]

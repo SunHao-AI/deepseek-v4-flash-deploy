@@ -48,7 +48,7 @@ mkdir -p "$LOG_DIR"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 LAUNCH_LOG="$LOG_DIR/launch-$STAMP.log"
 
-ARGS=(--model "$MODEL" --skip-build --no-console --port "$PORT" --parallel "$PARALLEL")
+ARGS=(--model "$MODEL" --skip-build --no-console --port "$PORT" --parallel "$PARALLEL" --metrics)
 if [[ -n "$CTX_SIZE" ]]; then
   ARGS+=(--ctx-size "$CTX_SIZE")
 fi
