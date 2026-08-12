@@ -6,12 +6,19 @@
 # ===============================================================================
 """cc-switch 用量统计服务。
 
-轮询 llama-server 的 /metrics（Prometheus）端点，聚合自启动以来累计的
+聚合 llama-server 的 /metrics（Prometheus）端点，自启动以来累计的
 输入/输出 tokens 与生成速率，按 DeepSeek-V4-Flash 官方价格折算累计费用，
 并暴露 /api/usage 供 cc-switch 的「用量查询 → 自定义」配置消费。
 
+支持两种数据获取模式（--mode / USAGE_MODE）：
+- poll（默认）：后台线程按 USAGE_POLL_INTERVAL 定时轮询 /metrics，
+  /api/usage 返回最近一次缓存快照，响应快、对 llama-server 压力恒定。
+- on-demand（主动获取）：不启动后台线程，由 cc-switch 轮询触发，
+  每次 /api/usage 请求时同步拉取一次最新 /metrics，数据实时性最好。
+
 纯标准库实现，零第三方依赖。运行：
     python3 script/usage_stats_server.py
+    python3 script/usage_stats_server.py --mode on-demand
 """
 
 from __future__ import annotations
@@ -143,24 +150,40 @@ def build_payload(snap: dict, price_in: float, price_out: float, budget: float |
 
 
 class UsageCollector:
-    """后台轮询 llama-server /metrics，维护最近一次用量快照。"""
+    """聚合 llama-server /metrics 用量。
 
-    def __init__(self, base_url: str, poll_interval: float, api_key: str | None) -> None:
+    mode="poll"：后台线程定时轮询，维护最近一次缓存快照；
+    mode="on-demand"：不启动后台线程，由 get_snapshot() 在每次请求时同步拉取。
+    """
+
+    def __init__(self, base_url: str, poll_interval: float, api_key: str | None, mode: str = "poll") -> None:
         self.base_url = base_url.rstrip("/")
         self.poll_interval = poll_interval
         self.api_key = api_key
+        self.mode = mode
         self._lock = threading.Lock()
         self._snapshot = {"ok": False, "error": None, "prompt_total": 0.0, "predicted_total": 0.0, "prompt_rate": 0.0, "predicted_rate": 0.0}
         self._last = {"time": None, "predicted_total": 0.0}
         self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread = threading.Thread(target=self._loop, daemon=True) if mode == "poll" else None
 
     def start(self) -> None:
-        self._thread.start()
+        if self._thread is not None:
+            self._thread.start()
 
     def stop(self) -> None:
         self._stop.set()
-        self._thread.join(timeout=5)
+        if self._thread is not None:
+            self._thread.join(timeout=5)
+
+    def get_snapshot(self) -> dict:
+        """返回用量快照。
+
+        poll 模式返回最近一次缓存快照；on-demand 模式先同步拉取一次最新指标再返回。
+        """
+        if self.mode == "on-demand":
+            self._poll_once()
+        return self.snapshot()
 
     def _loop(self) -> None:
         while not self._stop.is_set():
@@ -208,7 +231,7 @@ class UsageHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 —— http.server 命名约定
         if self.path.rstrip("/") == "/api/usage":
             cfg = self.config
-            payload = build_payload(cfg["collector"].snapshot(), cfg["price_in"], cfg["price_out"], cfg["budget"])
+            payload = build_payload(cfg["collector"].get_snapshot(), cfg["price_in"], cfg["price_out"], cfg["budget"])
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -229,6 +252,12 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=int(os.environ.get("USAGE_PORT", "5002")))
     parser.add_argument("--llama-base", default=os.environ.get("USAGE_LLAMA_BASE", "http://192.168.77.210:18888"))
     parser.add_argument("--poll-interval", type=float, default=float(os.environ.get("USAGE_POLL_INTERVAL", "5")))
+    parser.add_argument(
+        "--mode",
+        choices=("poll", "on-demand"),
+        default=os.environ.get("USAGE_MODE", "poll"),
+        help="数据获取模式：poll=后台定时轮询（默认）；on-demand=由 cc-switch 轮询触发、每次请求同步拉取",
+    )
     parser.add_argument("--price-in", type=float, default=float(os.environ.get("USAGE_PRICE_IN", "1.0")))
     parser.add_argument("--price-out", type=float, default=float(os.environ.get("USAGE_PRICE_OUT", "2.0")))
     parser.add_argument("--budget", type=float, default=(float(os.environ["USAGE_BUDGET"]) if os.environ.get("USAGE_BUDGET") else None))
@@ -239,12 +268,13 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    collector = UsageCollector(args.llama_base, args.poll_interval, args.api_key)
+    collector = UsageCollector(args.llama_base, args.poll_interval, args.api_key, mode=args.mode)
     collector.start()
 
     UsageHandler.config = {"collector": collector, "price_in": args.price_in, "price_out": args.price_out, "budget": args.budget}
     server = ThreadingHTTPServer((args.host, args.port), UsageHandler)
-    print(f"cc-switch 用量统计服务运行于 http://{args.host}:{args.port}/api/usage（轮询 {args.llama_base}/metrics）", flush=True)
+    mode_desc = "由 cc-switch 轮询触发、每次请求同步拉取" if args.mode == "on-demand" else f"后台每 {args.poll_interval:g}s 轮询"
+    print(f"cc-switch 用量统计服务运行于 http://{args.host}:{args.port}/api/usage（{mode_desc} {args.llama_base}/metrics）", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

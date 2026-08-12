@@ -189,6 +189,41 @@ class TestUsageCollector(unittest.TestCase):
         self.assertFalse(snap["ok"])
         self.assertIn("connection refused", snap["error"])
 
+    def test_on_demand_has_no_background_thread(self):
+        collector = UsageCollector("http://127.0.0.1:18888", 5, api_key=None, mode="on-demand")
+        self.assertIsNone(collector._thread)
+        # start() 不应抛错（无后台线程）
+        collector.start()
+        collector.stop()
+
+    def test_poll_mode_has_background_thread(self):
+        collector = UsageCollector("http://127.0.0.1:18888", 5, api_key=None, mode="poll")
+        self.assertIsNotNone(collector._thread)
+
+    def test_get_snapshot_on_demand_fetches_fresh(self):
+        # on-demand 模式：get_snapshot() 每次同步拉取最新指标
+        metrics_text = (
+            'llamacpp:prompt_tokens_total 100\n'
+            'llamacpp:tokens_predicted_total 200\n'
+            'llamacpp:prompt_tokens_seconds 300\n'
+            'llamacpp:predicted_tokens_seconds 50\n'
+        )
+        collector = UsageCollector("http://127.0.0.1:18888", 5, api_key=None, mode="on-demand")
+        with mock.patch("urllib.request.urlopen", side_effect=lambda req, timeout=0: FakeResponse(metrics_text.encode("utf-8"))):
+            snap = collector.get_snapshot()
+        self.assertTrue(snap["ok"])
+        self.assertEqual(snap["prompt_total"], 100.0)
+        self.assertEqual(snap["predicted_total"], 200.0)
+        self.assertAlmostEqual(snap["predicted_rate"], 50.0)
+
+    def test_get_snapshot_poll_returns_cached(self):
+        # poll 模式：get_snapshot() 不触发网络请求，直接返回缓存快照
+        collector = UsageCollector("http://127.0.0.1:18888", 5, api_key=None, mode="poll")
+        collector._snapshot = {"ok": True, "error": None, "prompt_total": 7.0, "predicted_total": 8.0, "prompt_rate": 0.0, "predicted_rate": 0.0}
+        with mock.patch("urllib.request.urlopen", side_effect=AssertionError("poll 模式不应发起网络请求")):
+            snap = collector.get_snapshot()
+        self.assertEqual(snap["prompt_total"], 7.0)
+
     def test_rate_fallback_by_delta(self):
         # 无速率 gauge 时，用轮询差值计算速率；mock time.monotonic 冻结时钟保证跨平台稳定
         collector = UsageCollector("http://127.0.0.1:18888", 5, api_key=None)

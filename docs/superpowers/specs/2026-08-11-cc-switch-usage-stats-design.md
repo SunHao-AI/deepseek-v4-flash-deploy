@@ -73,8 +73,10 @@ cc-switch ──> nginx（监听 :5000，sites-enabled/myflaskapp）
 
 **功能**：
 
-1. **定时轮询**（默认每 5 秒）llama-server `/metrics`
-2. **指标解析**（容错匹配新旧版本指标名，正则匹配）：
+1. **数据获取模式**（`--mode` / `USAGE_MODE`，二选一）：
+   - `poll`（默认）：后台线程按 `USAGE_POLL_INTERVAL`（默认 5 秒）定时轮询 llama-server `/metrics`，`/api/usage` 返回最近一次缓存快照，响应快、对 llama-server 压力恒定
+   - `on-demand`（主动获取）：不启动后台线程，由 cc-switch 轮询触发，每次 `/api/usage` 请求时同步拉取一次最新 `/metrics`，数据实时性最好；代价是每次请求都会访问 llama-server（约 10s 超时上限）
+3. **指标解析**（容错匹配新旧版本指标名，正则匹配）：
 
    | 用途 | 早期版本（无前缀 / `llama_`） | b10298+（`llamacpp:` 前缀，本部署实测） |
    |---|---|---|
@@ -82,7 +84,7 @@ cc-switch ──> nginx（监听 :5000，sites-enabled/myflaskapp）
    | 累计输出 tokens | `tokens_predicted_total` | `llamacpp:tokens_predicted_total` |
    | 生成速率 tok/s | `predicted_tokens_seconds`（gauge） | `llamacpp:predicted_tokens_seconds` |
 
-3. **费用计算**（.env 可配置，官方价默认）：
+4. **费用计算**（.env 可配置，官方价默认）：
 
    ```
    费用 = 累计输入tokens / 1e6 × PRICE_IN + 累计输出tokens / 1e6 × PRICE_OUT
@@ -90,7 +92,7 @@ cc-switch ──> nginx（监听 :5000，sites-enabled/myflaskapp）
    PRICE_OUT = 2.0 元/M
    ```
 
-4. **`/api/usage` 响应**（cc-switch extractor 直接消费）：
+5. **`/api/usage` 响应**（cc-switch extractor 直接消费）：
 
    ```json
    {
@@ -153,7 +155,8 @@ location ~ ^/210/llm/v1/api/usage(.*)$ {
 | `USAGE_HOST` | `127.0.0.1` | 监听地址；由 nginx 所在机器跨机访问时设 `0.0.0.0` |
 | `USAGE_PORT` | `5002` | 统计服务监听端口 |
 | `USAGE_LLAMA_BASE` | `http://192.168.77.210:18888` | llama-server 地址 |
-| `USAGE_POLL_INTERVAL` | `5` | 轮询间隔（秒） |
+| `USAGE_MODE` | `poll` | 数据获取模式：`poll`=后台定时轮询；`on-demand`=由 cc-switch 轮询触发、每次请求同步拉取 |
+| `USAGE_POLL_INTERVAL` | `5` | 轮询间隔（秒）；仅 `poll` 模式生效 |
 | `USAGE_PRICE_IN` | `1.0` | 输入单价（元/M tokens） |
 | `USAGE_PRICE_OUT` | `2.0` | 输出单价（元/M tokens） |
 | `USAGE_BUDGET` | 空 | 预算（元），空则不显示 total/remaining |
@@ -163,13 +166,15 @@ location ~ ^/210/llm/v1/api/usage(.*)$ {
 
 1. cc-switch 发起 `GET {{baseUrl}}/api/usage`
 2. nginx 精确匹配 `/210/llm/v1/api/usage` → 转发到 `192.168.77.210:5002/api/usage`（B 机统计服务）
-3. 统计服务返回最近一次轮询结果（内存态，含缓存时间戳）
+3. 统计服务按模式返回用量：
+   - `poll`：返回最近一次后台轮询结果（内存态缓存快照）
+   - `on-demand`：本次请求同步拉取一次 llama-server `/metrics` 后返回最新结果
 4. cc-switch extractor 提取字段并展示到供应商卡片
 
 ## 6. 错误处理与边界
 
 - llama-server 未启动 / `/metrics` 未启用 → 统计服务返回 `{"isValid": false, "invalidMessage": "..."}`，cc-switch 卡片显示红色失效提示
-- 首次轮询完成前 → 返回全 0 数据（不误导）
+- `poll` 模式首次轮询完成前 → 返回全 0 数据（不误导）；`on-demand` 模式每次请求实时拉取，无此窗口期
 - `/metrics` 若要求鉴权 → 统计服务透传 `LLAMA_API_KEY` 作为 Bearer
 - 统计服务为单文件常驻进程，崩溃时手动重启（不做守护化，保持简单，YAGNI）
 - 指标名容错：新旧版本前缀均支持；都无法匹配时视为服务不可用
@@ -180,8 +185,8 @@ location ~ ^/210/llm/v1/api/usage(.*)$ {
 |---|---|
 | `script/start_v4_flash_gguf.py` | 修改：追加 `--metrics` |
 | `script/start_v4_flash_background.sh` | 修改：ARGS 追加 `--metrics` |
-| `script/usage_stats_server.py` | 新增：统计服务 |
-| `.env.example` | 修改：新增用量统计配置段 |
+| `script/usage_stats_server.py` | 新增：统计服务（含 `poll` / `on-demand` 双模式） |
+| `.env.example` | 修改：新增用量统计配置段（含 `USAGE_MODE`） |
 | nginx `sites-enabled/myflaskapp` | 修改（服务器侧）：新增精确匹配 location |
 | cc-switch | 配置（用户侧）：粘贴用量查询配置 |
 
