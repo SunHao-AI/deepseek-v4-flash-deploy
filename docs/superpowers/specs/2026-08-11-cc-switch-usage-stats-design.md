@@ -130,8 +130,8 @@ location ~ ^/210/llm/v1/api/usage$ {
     headers: { "Authorization": "Bearer {{apiKey}}", "User-Agent": "cc-switch/1.0" }
   },
   extractor: function(response) {
-    if (!response || response.error) {
-      return { isValid: false, invalidMessage: (response && response.error && response.error.message) || "接口调用失败" };
+    if (!response || response.error || response.isValid === false) {
+      return { isValid: false, invalidMessage: (response && (response.invalidMessage || (response.error && response.error.message))) || "接口调用失败" };
     }
     return {
       isValid: true,
