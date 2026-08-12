@@ -147,16 +147,17 @@ class TestUsageCollector(unittest.TestCase):
         self.assertIn("connection refused", snap["error"])
 
     def test_rate_fallback_by_delta(self):
-        # 无速率 gauge 时，用轮询差值计算速率
+        # 无速率 gauge 时，用轮询差值计算速率；mock time.monotonic 冻结时钟保证跨平台稳定
         collector = UsageCollector("http://127.0.0.1:18888", 5, api_key=None)
         text1 = 'llamacpp:tokens_predicted_total{t="all"} 100\n'
         text2 = 'llamacpp:tokens_predicted_total{t="all"} 150\n'
-        with mock.patch("urllib.request.urlopen", side_effect=lambda req, timeout=0: FakeResponse(text1.encode("utf-8"))):
-            collector._poll_once()
-        # 手动前移 last 时间，模拟 2 秒间隔
-        collector._last["time"] -= 2.0
-        with mock.patch("urllib.request.urlopen", side_effect=lambda req, timeout=0: FakeResponse(text2.encode("utf-8"))):
-            collector._poll_once()
+        with mock.patch("usage_stats_server.time.monotonic", return_value=100.0):
+            with mock.patch("urllib.request.urlopen", side_effect=lambda req, timeout=0: FakeResponse(text1.encode("utf-8"))):
+                collector._poll_once()
+        # 第二次轮询，模拟 2 秒间隔（monotonic 返回 102.0）
+        with mock.patch("usage_stats_server.time.monotonic", return_value=102.0):
+            with mock.patch("urllib.request.urlopen", side_effect=lambda req, timeout=0: FakeResponse(text2.encode("utf-8"))):
+                collector._poll_once()
         snap = collector.snapshot()
         self.assertAlmostEqual(snap["predicted_rate"], 25.0)  # (150-100)/2
 
