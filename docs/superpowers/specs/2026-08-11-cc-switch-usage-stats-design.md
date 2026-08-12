@@ -41,16 +41,16 @@ cc-switch ──> nginx（监听 :5000，sites-enabled/myflaskapp）
                                        │
                                        ▼
                             ┌────────────────────┐
-                            │ 统计服务            │
-                            │ 127.0.0.1:5002     │
+                            │ 统计服务（B 机）    │
+                            │ 0.0.0.0:5002       │
                             │ /api/usage         │
                             └────────────────────┘
-                                       │ 每 5s 轮询
+                                       │ 每 5s 轮询（同机回环）
                                        ▼
                             ┌────────────────────┐
                             │ llama-server       │
-                            │ 192.168.77.210:    │
-                            │ 18888/metrics      │
+                            │ 127.0.0.1:18888    │
+                            │ /metrics           │
                             │（需 --metrics）     │
                             └────────────────────┘
 ```
@@ -114,7 +114,7 @@ cc-switch ──> nginx（监听 :5000，sites-enabled/myflaskapp）
 ```nginx
 # ---- 210 LLM 用量统计（cc-switch 用量查询）----
 location ~ ^/210/llm/v1/api/usage$ {
-    proxy_pass http://127.0.0.1:5002/api/usage;
+    proxy_pass http://192.168.77.210:5002/api/usage;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
 }
@@ -150,6 +150,7 @@ location ~ ^/210/llm/v1/api/usage$ {
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
+| `USAGE_HOST` | `127.0.0.1` | 监听地址；由 nginx 所在机器跨机访问时设 `0.0.0.0` |
 | `USAGE_PORT` | `5002` | 统计服务监听端口 |
 | `USAGE_LLAMA_BASE` | `http://192.168.77.210:18888` | llama-server 地址 |
 | `USAGE_POLL_INTERVAL` | `5` | 轮询间隔（秒） |
@@ -161,7 +162,7 @@ location ~ ^/210/llm/v1/api/usage$ {
 ## 5. 数据流
 
 1. cc-switch 发起 `GET {{baseUrl}}/api/usage`
-2. nginx 精确匹配 `/210/llm/v1/api/usage` → 转发到 `127.0.0.1:5002/api/usage`
+2. nginx 精确匹配 `/210/llm/v1/api/usage` → 转发到 `192.168.77.210:5002/api/usage`（B 机统计服务）
 3. 统计服务返回最近一次轮询结果（内存态，含缓存时间戳）
 4. cc-switch extractor 提取字段并展示到供应商卡片
 

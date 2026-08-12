@@ -692,7 +692,7 @@ git commit -m "docs: .env.example 新增 cc-switch 用量统计服务配置段"
 ```nginx
     # ---- 210 LLM 用量统计（cc-switch 用量查询）----
     location ~ ^/210/llm/v1/api/usage$ {
-        proxy_pass http://127.0.0.1:5002/api/usage;
+        proxy_pass http://192.168.77.210:5002/api/usage;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
@@ -709,16 +709,23 @@ Expected: 输出包含累计 tokens 与速率的指标行
 
 - [ ] **Step 3: 启动统计服务并验证接口**
 
-在节点 210 上启动统计服务（需先 `cp .env.example .env` 并按需修改，再执行）：
+在节点 210（B 机）上启动统计服务。统计服务与 llama-server 同机，轮询走回环；需监听 `0.0.0.0` 供 nginx 所在机器（A 机）跨机访问，故 `.env` 中设置：
+
+```bash
+USAGE_HOST=0.0.0.0
+USAGE_LLAMA_BASE=http://127.0.0.1:18888
+```
+
+（先 `cp .env.example .env` 并按需修改，再执行）
 
 Run: `nohup python3 script/usage_stats_server.py >> /raid5/sh/logs/usage-stats.log 2>&1 &`
-然后验证本机与 nginx 链路：
+然后验证 B 机本机与 A 机 nginx 链路：
 
-Run: `curl http://127.0.0.1:5002/api/usage`
+Run（B 机）: `curl http://127.0.0.1:5002/api/usage`
 Expected: JSON，`isValid: true`，含 `used` / `extra` / `unit: "CNY"`
 
-Run: `curl http://127.0.0.1:5000/210/llm/v1/api/usage`
-Expected: 同一 JSON（nginx 转发链路通）
+Run（A 机）: `curl http://127.0.0.1:5000/210/llm/v1/api/usage`
+Expected: 同一 JSON（nginx 跨机转发链路通）
 
 - [ ] **Step 4: cc-switch 用量查询配置**
 

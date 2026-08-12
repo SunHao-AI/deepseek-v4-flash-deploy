@@ -212,6 +212,7 @@ class UsageHandler(BaseHTTPRequestHandler):
 def main() -> None:
     load_env()
     parser = argparse.ArgumentParser(description="cc-switch 用量统计服务（轮询 llama-server /metrics 并暴露 /api/usage）")
+    parser.add_argument("--host", default=os.environ.get("USAGE_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("USAGE_PORT", "5002")))
     parser.add_argument("--llama-base", default=os.environ.get("USAGE_LLAMA_BASE", "http://192.168.77.210:18888"))
     parser.add_argument("--poll-interval", type=float, default=float(os.environ.get("USAGE_POLL_INTERVAL", "5")))
@@ -225,8 +226,8 @@ def main() -> None:
     collector.start()
 
     UsageHandler.config = {"collector": collector, "price_in": args.price_in, "price_out": args.price_out, "budget": args.budget}
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), UsageHandler)
-    print(f"cc-switch 用量统计服务运行于 http://127.0.0.1:{args.port}/api/usage（轮询 {args.llama_base}/metrics）", flush=True)
+    server = ThreadingHTTPServer((args.host, args.port), UsageHandler)
+    print(f"cc-switch 用量统计服务运行于 http://{args.host}:{args.port}/api/usage（轮询 {args.llama_base}/metrics）", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
