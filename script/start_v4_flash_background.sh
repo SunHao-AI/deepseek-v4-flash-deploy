@@ -48,7 +48,8 @@ mkdir -p "$LOG_DIR"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 LAUNCH_LOG="$LOG_DIR/launch-$STAMP.log"
 
-ARGS=(--model "$MODEL" --skip-build --no-console --port "$PORT" --parallel "$PARALLEL" --metrics)
+# --metrics 已由 start_v4_flash_gguf.py 内置（llama-server /metrics 端点），此处不再传参
+ARGS=(--model "$MODEL" --skip-build --no-console --port "$PORT" --parallel "$PARALLEL")
 if [[ -n "$CTX_SIZE" ]]; then
   ARGS+=(--ctx-size "$CTX_SIZE")
 fi
@@ -89,5 +90,5 @@ if [[ -n "$USAGE_PID" ]]; then
 else
   echo " 停止服务:  kill $LLAMA_PID ; pkill -f usage_stats_server.py"
 fi
-echo " 强制停止:  fuser -k ${PORT}/tcp ; pkill -f usage_stats_server.py"
+echo " 强制停止:  pkill -f start_v4_flash_gguf.py ; pkill -x llama-server ; pkill -f usage_stats_server.py"
 echo "======================================"
