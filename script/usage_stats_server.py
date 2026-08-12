@@ -37,6 +37,15 @@ METRIC_NAMES = {
     "predicted_rate": ["llamacpp:tokens_predicted_seconds", "llamacpp:predicted_tokens_seconds", "predicted_tokens_seconds"],
 }
 
+# 预编译的指标匹配模式（避免每轮轮询重复编译正则）
+METRIC_PATTERNS = {
+    key: [
+        re.compile(r"^" + re.escape(name) + r"(?:\{[^}]*\})?\s+([0-9.eE+-]+)$", re.MULTILINE)
+        for name in names
+    ]
+    for key, names in METRIC_NAMES.items()
+}
+
 
 def _fmt_int(value: float) -> str:
     """千分位格式化整数。"""
@@ -49,9 +58,8 @@ def parse_metrics(text: str) -> dict[str, float]:
     缺失的指标返回 0.0；速率为 gauge 值（tok/s）。
     """
     result = {"prompt_total": 0.0, "predicted_total": 0.0, "prompt_rate": 0.0, "predicted_rate": 0.0}
-    for key, names in METRIC_NAMES.items():
-        for name in names:
-            pattern = re.compile(r"^" + re.escape(name) + r"(?:\{[^}]*\})?\s+([0-9.eE+-]+)$", re.MULTILINE)
+    for key, patterns in METRIC_PATTERNS.items():
+        for pattern in patterns:
             m = pattern.search(text)
             if m:
                 try:
@@ -161,7 +169,7 @@ class UsageCollector:
                 delta_t = now - self._last["time"]
                 delta_tokens = metrics["predicted_total"] - self._last["predicted_total"]
                 if delta_t > 0:
-                    rate = delta_tokens / delta_t
+                    rate = max(delta_tokens / delta_t, 0.0)
             with self._lock:
                 self._snapshot = {
                     "ok": True,
