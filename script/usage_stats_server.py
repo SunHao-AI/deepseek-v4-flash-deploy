@@ -219,7 +219,11 @@ def main() -> None:
     parser.add_argument("--price-in", type=float, default=float(os.environ.get("USAGE_PRICE_IN", "1.0")))
     parser.add_argument("--price-out", type=float, default=float(os.environ.get("USAGE_PRICE_OUT", "2.0")))
     parser.add_argument("--budget", type=float, default=(float(os.environ["USAGE_BUDGET"]) if os.environ.get("USAGE_BUDGET") else None))
-    parser.add_argument("--api-key", default=os.environ.get("LLAMA_API_KEY") or None)
+    parser.add_argument(
+        "--api-key",
+        default=os.environ.get("LLAMA_API_KEY") or os.environ.get("API_KEY") or None,
+        help="轮询 /metrics 时携带的 Bearer token；默认取 LLAMA_API_KEY，未设置则回退复用 API_KEY",
+    )
     args = parser.parse_args()
 
     collector = UsageCollector(args.llama_base, args.poll_interval, args.api_key)
