@@ -75,9 +75,10 @@ curl http://127.0.0.1:18888/health
 pgrep -af "start_v4_flash_gguf|llama-server|usage_stats_server"
 
 # 停止服务（llama-server + 用量统计服务）
-# 快捷方式：按端口一键杀死 18888 端口的 llama-server
+# 快捷方式：按端口一键杀死 llama-server（18888）与用量统计服务（5002）
 fuser -k 18888/tcp
-pkill -f usage_stats_server.py      # 完全停止还需杀掉用量统计服务（如已启动）
+fuser -k 5002/tcp
+pkill -f usage_stats_server.py      # 兜底：按进程名停止用量统计服务（如端口命令未生效）
 
 # 或按进程名停止（效果同上）
 # pkill -f "start_v4_flash_gguf.py"

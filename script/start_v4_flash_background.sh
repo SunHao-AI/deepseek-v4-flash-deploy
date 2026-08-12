@@ -84,5 +84,10 @@ fi
 echo " 用量统计服务日志: $USAGE_LOG"
 echo " 健康检查:  curl http://127.0.0.1:${PORT}/health"
 echo " 用量查询:  curl http://127.0.0.1:${USAGE_PORT:-5002}/api/usage"
-echo " 停止服务:  kill $LLAMA_PID${USAGE_PID:+ $USAGE_PID}"
+if [[ -n "$USAGE_PID" ]]; then
+  echo " 停止服务:  kill $LLAMA_PID $USAGE_PID"
+else
+  echo " 停止服务:  kill $LLAMA_PID ; pkill -f usage_stats_server.py"
+fi
+echo " 强制停止:  fuser -k ${PORT}/tcp ; pkill -f usage_stats_server.py"
 echo "======================================"
