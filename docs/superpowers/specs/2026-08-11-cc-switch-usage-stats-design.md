@@ -76,11 +76,11 @@ cc-switch ──> nginx（监听 :5000，sites-enabled/myflaskapp）
 1. **定时轮询**（默认每 5 秒）llama-server `/metrics`
 2. **指标解析**（容错匹配新旧版本指标名，正则匹配）：
 
-   | 用途 | 旧版指标名 | 新版指标名（`llamacpp:` 前缀） |
+   | 用途 | 早期版本（无前缀 / `llama_`） | b10298+（`llamacpp:` 前缀，本部署实测） |
    |---|---|---|
-   | 累计输入 tokens | `prompt_tokens_total` | `llamacpp:tokens_evaluated_total` |
+   | 累计输入 tokens | `prompt_tokens_total` | `llamacpp:prompt_tokens_total` |
    | 累计输出 tokens | `tokens_predicted_total` | `llamacpp:tokens_predicted_total` |
-   | 生成速率 tok/s | `predicted_tokens_seconds`（gauge） | `llamacpp:tokens_predicted_seconds` |
+   | 生成速率 tok/s | `predicted_tokens_seconds`（gauge） | `llamacpp:predicted_tokens_seconds` |
 
 3. **费用计算**（.env 可配置，官方价默认）：
 

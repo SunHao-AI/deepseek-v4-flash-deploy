@@ -51,6 +51,21 @@ class TestParseMetrics(unittest.TestCase):
         self.assertAlmostEqual(m["predicted_rate"], 55.2)
 
     def test_new_llamacpp_prefix(self):
+        # llama.cpp b10298+（DeepSeek-V4 部署版本）实际命名
+        text = (
+            'llamacpp:prompt_tokens_total 10\n'
+            'llamacpp:tokens_predicted_total 20\n'
+            'llamacpp:prompt_tokens_seconds 300\n'
+            'llamacpp:predicted_tokens_seconds 60\n'
+        )
+        m = parse_metrics(text)
+        self.assertEqual(m["prompt_total"], 10.0)
+        self.assertEqual(m["predicted_total"], 20.0)
+        self.assertEqual(m["prompt_rate"], 300.0)
+        self.assertAlmostEqual(m["predicted_rate"], 60.0)
+
+    def test_old_llamacpp_prefix(self):
+        # llama.cpp 2024-2025 中期旧命名（tokens_evaluated_total），仍需兼容
         text = (
             'llamacpp:tokens_evaluated_total{t="all"} 10\n'
             'llamacpp:tokens_predicted_total{t="all"} 20\n'
@@ -62,6 +77,34 @@ class TestParseMetrics(unittest.TestCase):
         self.assertEqual(m["predicted_total"], 20.0)
         self.assertEqual(m["prompt_rate"], 300.0)
         self.assertAlmostEqual(m["predicted_rate"], 60.0)
+
+    def test_b10298_full_metrics(self):
+        # 官方 llama.cpp b10298 /metrics 完整输出（含 HELP/TYPE 注释行）
+        text = (
+            "# HELP llamacpp:prompt_tokens_total Number of prompt tokens processed.\n"
+            "# TYPE llamacpp:prompt_tokens_total counter\n"
+            "llamacpp:prompt_tokens_total 73163\n"
+            "# HELP llamacpp:prompt_seconds_total Prompt process time\n"
+            "# TYPE llamacpp:prompt_seconds_total counter\n"
+            "llamacpp:prompt_seconds_total 83.483\n"
+            "# HELP llamacpp:tokens_predicted_total Number of generation tokens processed.\n"
+            "# TYPE llamacpp:tokens_predicted_total counter\n"
+            "llamacpp:tokens_predicted_total 7637\n"
+            "# HELP llamacpp:tokens_predicted_seconds_total Predict process time\n"
+            "# TYPE llamacpp:tokens_predicted_seconds_total counter\n"
+            "llamacpp:tokens_predicted_seconds_total 160.979\n"
+            "# HELP llamacpp:prompt_tokens_seconds Average prompt throughput in tokens/s.\n"
+            "# TYPE llamacpp:prompt_tokens_seconds gauge\n"
+            "llamacpp:prompt_tokens_seconds 876.382\n"
+            "# HELP llamacpp:predicted_tokens_seconds Average generation throughput in tokens/s.\n"
+            "# TYPE llamacpp:predicted_tokens_seconds gauge\n"
+            "llamacpp:predicted_tokens_seconds 47.441\n"
+        )
+        m = parse_metrics(text)
+        self.assertEqual(m["prompt_total"], 73163.0)
+        self.assertEqual(m["predicted_total"], 7637.0)
+        self.assertAlmostEqual(m["prompt_rate"], 876.382)
+        self.assertAlmostEqual(m["predicted_rate"], 47.441)
 
     def test_empty_text(self):
         m = parse_metrics("")
@@ -105,10 +148,10 @@ class TestBuildPayload(unittest.TestCase):
 class TestUsageCollector(unittest.TestCase):
     def test_poll_once_success(self):
         metrics_text = (
-            'llamacpp:tokens_evaluated_total{t="all"} 100\n'
-            'llamacpp:tokens_predicted_total{t="all"} 200\n'
-            'llamacpp:prompt_tokens_seconds{t="all"} 300\n'
-            'llamacpp:tokens_predicted_seconds{t="all"} 50\n'
+            'llamacpp:prompt_tokens_total 100\n'
+            'llamacpp:tokens_predicted_total 200\n'
+            'llamacpp:prompt_tokens_seconds 300\n'
+            'llamacpp:predicted_tokens_seconds 50\n'
         )
 
         def fake_urlopen(request, timeout: float = 0):  # noqa: ARG001

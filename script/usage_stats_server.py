@@ -29,12 +29,25 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 
-# Prometheus 指标名（按 llama.cpp 新旧版本前缀做容错匹配，取第一个命中的）
+# Prometheus 指标名（按 llama.cpp 新旧版本命名做容错匹配，取第一个命中的）
+# 官方 llama.cpp b10298（DeepSeek-V4 部署版本）实测命名：
+#   输入计数 llamacpp:prompt_tokens_total、输出计数 llamacpp:tokens_predicted_total
+#   速率 gauge llamacpp:prompt_tokens_seconds / llamacpp:predicted_tokens_seconds
 METRIC_NAMES = {
-    "prompt_total": ["llamacpp:tokens_evaluated_total", "llama_tokens_evaluated_total", "prompt_tokens_total"],
-    "predicted_total": ["llamacpp:tokens_predicted_total", "llama_tokens_predicted_total", "tokens_predicted_total"],
+    "prompt_total": [
+        "llamacpp:prompt_tokens_total",     # llama.cpp b10298+（当前部署版本）
+        "llamacpp:tokens_evaluated_total",  # llama.cpp 2024-2025 中期旧命名
+        "llama_tokens_evaluated_total",     # llama.cpp 2024 早期
+        "prompt_tokens_total",              # llama.cpp 2023 无前缀
+    ],
+    "predicted_total": [
+        "llamacpp:tokens_predicted_total",  # llama.cpp 2024+（b10298 亦为此名）
+        "llamacpp:predicted_tokens_total",  # 防御性变体（部分 fork/版本顺序不同）
+        "llama_tokens_predicted_total",     # llama.cpp 2024 早期
+        "tokens_predicted_total",           # llama.cpp 2023 无前缀
+    ],
     "prompt_rate": ["llamacpp:prompt_tokens_seconds", "prompt_tokens_seconds"],
-    "predicted_rate": ["llamacpp:tokens_predicted_seconds", "llamacpp:predicted_tokens_seconds", "predicted_tokens_seconds"],
+    "predicted_rate": ["llamacpp:predicted_tokens_seconds", "llamacpp:tokens_predicted_seconds", "predicted_tokens_seconds"],
 }
 
 # 预编译的指标匹配模式（避免每轮轮询重复编译正则）
