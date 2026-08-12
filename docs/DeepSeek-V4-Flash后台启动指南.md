@@ -49,7 +49,14 @@ vi .env          # 按部署环境修改
 两个脚本位于 `script/` 目录，启动时会自动读取项目根目录的 `.env`。确认 `.env` 配置无误后：
 
 ```bash
+# 启动（默认）
 bash script/start_v4_flash_background.sh
+
+# 停止服务（llama-server + 用量统计服务）
+bash script/start_v4_flash_background.sh stop
+
+# 重启（先停后启）
+bash script/start_v4_flash_background.sh restart
 ```
 
 脚本会：
@@ -61,6 +68,7 @@ bash script/start_v4_flash_background.sh
 5. 默认带 API key 启动（`.env` 的 `API_KEY`，留空则不校验）
 6. 打印 PID、日志路径、健康检查命令
 7. 未显式设置 `CTX_SIZE` 时，由 Python 按并发数自动计算总上下文（每并发 1M）
+8. 支持 `stop` / `restart` 子命令，统一停止 llama-server 与用量统计服务
 
 脚本内容：
 
@@ -68,7 +76,10 @@ bash script/start_v4_flash_background.sh
 #!/usr/bin/env bash
 # ============================================================
 # 后台启动 DeepSeek-V4-Flash 服务（官方 llama.cpp + DSpark）
-# 用法：bash script/start_v4_flash_background.sh
+# 用法：
+#   bash script/start_v4_flash_background.sh          # 启动（默认）
+#   bash script/start_v4_flash_background.sh stop     # 停止服务
+#   bash script/start_v4_flash_background.sh restart  # 重启（先停后启）
 #
 # 配置优先级：环境变量 > .env 文件 > 脚本内置默认值
 # 首次使用请先复制配置模板并按需修改：cp .env.example .env
@@ -80,6 +91,9 @@ bash script/start_v4_flash_background.sh
 #   <项目根>/../../logs     e.g. /raid5/sh/logs
 # ============================================================
 set -euo pipefail
+
+# 命令分发：start（默认）/ stop / restart
+ACTION="${1:-start}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -101,6 +115,37 @@ PORT="${PORT:-18888}"
 CTX_SIZE="${CTX_SIZE:-}"
 PARALLEL="${PARALLEL:-2}"
 API_KEY="${API_KEY:-root123456}"
+# 重复惩罚系数（.env 留空则不启用，llama-server 默认 1.0；如 1.15 可抑制复读）
+REPEAT_PENALTY="${REPEAT_PENALTY:-}"
+
+# ---- 停止服务（llama-server + 用量统计服务） ----
+stop_services() {
+  echo "正在停止服务..."
+  # 快捷方式：按端口一键杀死 llama-server（PORT）与用量统计服务（USAGE_PORT）
+  fuser -k "${PORT:-18888}"/tcp 2>/dev/null || true
+  fuser -k "${USAGE_PORT:-5002}"/tcp 2>/dev/null || true
+  # 兜底：按进程名停止（如端口命令未生效）
+  pkill -f usage_stats_server.py 2>/dev/null || true
+  pkill -f start_v4_flash_gguf.py 2>/dev/null || true
+  pkill -x llama-server 2>/dev/null || true
+  echo "停止完成。"
+}
+
+case "$ACTION" in
+  stop)
+    stop_services
+    exit 0
+    ;;
+  restart)
+    stop_services
+    ;;
+  start)
+    ;;
+  *)
+    echo "用法: $0 [start|stop|restart]" >&2
+    exit 1
+    ;;
+esac
 
 LOG_DIR="${LOG_DIR:-$(cd "$PROJECT_ROOT/../.." && pwd)/logs}"
 mkdir -p "$LOG_DIR"
@@ -115,6 +160,9 @@ fi
 if [[ -n "$API_KEY" ]]; then
   ARGS+=(--api-key "$API_KEY")
 fi
+if [[ -n "$REPEAT_PENALTY" ]]; then
+  ARGS+=(--repeat-penalty "$REPEAT_PENALTY")
+fi
 
 nohup python3 "$SCRIPT_DIR/start_v4_flash_gguf.py" "${ARGS[@]}" \
   > "$LAUNCH_LOG" 2>&1 &
@@ -124,7 +172,7 @@ echo " 已后台启动，PID: $!"
 echo " 启动日志:  $LAUNCH_LOG"
 echo " 服务日志:  $LOG_DIR/llama-server-${PORT}-*.log"
 echo " 健康检查:  curl http://127.0.0.1:${PORT}/health"
-echo " 停止服务:  kill $!"
+echo " 停止服务:  bash $0 stop"
 echo "======================================"
 ```
 
@@ -168,6 +216,14 @@ tail -f /raid5/sh/logs/llama-server-18888-*.log
 
 ## 停止服务
 
+推荐直接用脚本统一停止（会同时处理 llama-server 与用量统计服务）：
+
+```bash
+bash script/start_v4_flash_background.sh stop
+```
+
+如需手动操作：
+
 ```bash
 # 方式一：用脚本打印的 PID
 kill <PID>
@@ -183,7 +239,7 @@ curl http://127.0.0.1:18888/health   # 应连接失败
 
 ## 重启 / 换量化
 
-1. 停止服务（见上）
+1. 停止服务：`bash script/start_v4_flash_background.sh stop`（或直接 `restart` 一步完成）
 2. 修改 `.env` 中的 `MODEL` 路径（默认 `UD-Q8_K_XL`；例如换 `UD-Q4_K_XL`），或用命令行直接传 `--model`
 3. 重新 `bash script/start_v4_flash_background.sh`
 

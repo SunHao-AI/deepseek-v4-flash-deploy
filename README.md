@@ -67,15 +67,28 @@ curl http://127.0.0.1:18888/health
 
 ### 5. 停止 / 重启 / 查看日志
 
-```bash
-# 查看运行状态
-curl http://127.0.0.1:18888/health
+推荐直接用启动脚本统一管理（会同时处理 llama-server 与用量统计服务）：
 
-# 查看相关进程与 PID
-pgrep -af "start_v4_flash_gguf|llama-server|usage_stats_server"
+```bash
+# 启动（默认）
+bash script/start_v4_flash_background.sh
 
 # 停止服务（llama-server + 用量统计服务）
-# 快捷方式：按端口一键杀死 llama-server（18888）与用量统计服务（5002）
+bash script/start_v4_flash_background.sh stop
+
+# 重启（先停后启）
+bash script/start_v4_flash_background.sh restart
+
+# 查看运行状态
+curl http://127.0.0.1:18888/health
+```
+
+如需手动操作，可查看相关进程与 PID：
+
+```bash
+pgrep -af "start_v4_flash_gguf|llama-server|usage_stats_server"
+
+# 按端口一键杀死 llama-server（18888）与用量统计服务（5002）
 fuser -k 18888/tcp
 fuser -k 5002/tcp
 pkill -f usage_stats_server.py      # 兜底：按进程名停止用量统计服务（如端口命令未生效）
@@ -84,11 +97,11 @@ pkill -f usage_stats_server.py      # 兜底：按进程名停止用量统计服
 # pkill -f "start_v4_flash_gguf.py"
 # pkill -f "usage_stats_server.py"
 # pkill -x llama-server
+```
 
-# 重启（先停后启；后台脚本会同时拉起 llama-server 与用量统计服务）
-bash script/start_v4_flash_background.sh
+查看日志（LOG_DIR 默认 = 项目根目录上级的 `../logs/`）：
 
-# 查看日志（LOG_DIR 默认 = 项目根目录上级的 ../logs/）
+```bash
 tail -f ../logs/llama-server-18888-*.log   # llama-server 服务日志
 tail -f ../logs/usage-stats.log            # 用量统计服务日志
 tail -f ../logs/launch-*.log               # 最近一次启动日志

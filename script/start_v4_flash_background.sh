@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # ============================================================
 # 后台启动 DeepSeek-V4-Flash 服务（官方 llama.cpp + DSpark）
-# 用法：bash script/start_v4_flash_background.sh
+# 用法：
+#   bash script/start_v4_flash_background.sh          # 启动（默认）
+#   bash script/start_v4_flash_background.sh stop     # 停止服务
+#   bash script/start_v4_flash_background.sh restart  # 重启（先停后启）
 #
 # 配置优先级：环境变量 > .env 文件 > 脚本内置默认值
 # 首次使用请先复制配置模板并按需修改：
@@ -14,6 +17,9 @@
 #   <项目根>/../../logs     e.g. /raid5/sh/logs
 # ============================================================
 set -euo pipefail
+
+# 命令分发：start（默认）/ stop / restart
+ACTION="${1:-start}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -41,6 +47,35 @@ PARALLEL="${PARALLEL:-2}"
 API_KEY="${API_KEY:-root123456}"
 # 重复惩罚系数（.env 留空则不启用，llama-server 默认 1.0；如 1.15 可抑制复读）
 REPEAT_PENALTY="${REPEAT_PENALTY:-}"
+
+# ---- 停止服务（llama-server + 用量统计服务） ----
+stop_services() {
+  echo "正在停止服务..."
+  # 快捷方式：按端口一键杀死 llama-server（PORT）与用量统计服务（USAGE_PORT）
+  fuser -k "${PORT:-18888}"/tcp 2>/dev/null || true
+  fuser -k "${USAGE_PORT:-5002}"/tcp 2>/dev/null || true
+  # 兜底：按进程名停止（如端口命令未生效）
+  pkill -f usage_stats_server.py 2>/dev/null || true
+  pkill -f start_v4_flash_gguf.py 2>/dev/null || true
+  pkill -x llama-server 2>/dev/null || true
+  echo "停止完成。"
+}
+
+case "$ACTION" in
+  stop)
+    stop_services
+    exit 0
+    ;;
+  restart)
+    stop_services
+    ;;
+  start)
+    ;;
+  *)
+    echo "用法: $0 [start|stop|restart]" >&2
+    exit 1
+    ;;
+esac
 
 LOG_DIR="${LOG_DIR:-$(cd "$PROJECT_ROOT/../.." && pwd)/logs}"
 mkdir -p "$LOG_DIR"
