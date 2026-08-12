@@ -61,11 +61,28 @@ fi
 
 nohup python3 "$SCRIPT_DIR/start_v4_flash_gguf.py" "${ARGS[@]}" \
   > "$LAUNCH_LOG" 2>&1 &
+LLAMA_PID=$!
+
+# ---- cc-switch 用量统计服务（已运行则跳过，避免端口冲突） ----
+USAGE_LOG="$LOG_DIR/usage-stats.log"
+if ! curl -s -o /dev/null http://127.0.0.1:"${USAGE_PORT:-5002}"/api/usage; then
+  nohup python3 "$SCRIPT_DIR/usage_stats_server.py" >> "$USAGE_LOG" 2>&1 &
+  USAGE_PID=$!
+else
+  USAGE_PID=""
+fi
 
 echo "======================================"
-echo " 已后台启动，PID: $!"
+echo " 已后台启动，llama-server PID: $LLAMA_PID"
 echo " 启动日志:  $LAUNCH_LOG"
 echo " 服务日志:  $LOG_DIR/llama-server-${PORT}-*.log"
+if [[ -n "$USAGE_PID" ]]; then
+  echo " 用量统计服务已启动，PID: $USAGE_PID"
+else
+  echo " 用量统计服务已在运行"
+fi
+echo " 用量统计服务日志: $USAGE_LOG"
 echo " 健康检查:  curl http://127.0.0.1:${PORT}/health"
-echo " 停止服务:  kill $!"
+echo " 用量查询:  curl http://127.0.0.1:${USAGE_PORT:-5002}/api/usage"
+echo " 停止服务:  kill $LLAMA_PID${USAGE_PID:+ $USAGE_PID}"
 echo "======================================"
