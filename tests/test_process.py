@@ -1,0 +1,44 @@
+# -*- coding: utf-8 -*-
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "script"))
+
+from core import process  # noqa: E402
+
+
+def test_pid_file_path(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOG_DIR", str(tmp_path))
+    assert process.pid_file("demo") == tmp_path / "demo.pid"
+
+
+def test_start_and_is_running(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOG_DIR", str(tmp_path))
+    pid = process.start_detached("sleeper", [sys.executable, "-c", "import time; time.sleep(60)"], {})
+    assert pid > 0
+    assert process.is_running("sleeper")
+    process.stop_instance("sleeper", port=1, patterns=[])
+    deadline = time.time() + 5
+    while process.is_running("sleeper") and time.time() < deadline:
+        time.sleep(0.2)
+    assert not process.is_running("sleeper")
+
+
+def test_is_running_no_pidfile(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOG_DIR", str(tmp_path))
+    assert not process.is_running("ghost")
+
+
+def test_launch_log_created(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOG_DIR", str(tmp_path))
+    process.start_detached("echoer", [sys.executable, "-c", "print('hello-log')"], {})
+    time.sleep(1)
+    log = process.launch_log("echoer")
+    assert log is not None and "hello-log" in log.read_text(encoding="utf-8", errors="replace")
+
+
+def test_tail_file(tmp_path):
+    f = tmp_path / "x.log"
+    f.write_text("\n".join(f"line{i}" for i in range(100)), encoding="utf-8")
+    assert process.tail_file(f, 3).splitlines() == ["line97", "line98", "line99"]
