@@ -21,9 +21,7 @@ def _write(tmp_path, text, name="m.yaml"):
 
 def test_vllm_command(tmp_path, monkeypatch):
     monkeypatch.setenv("HF_HOME", "/raid5/sh/model/huggingface")
-    p = _write(tmp_path, "name: q\nengine: vllm\nport: 8000\nvllm:\n"
-               "  model: Qwen/Qwen3-32B\n  tensor_parallel_size: 2\n  max_model_len: 32768\n"
-               "  extra_args: \"--enable-prefix-caching\"\n")
+    p = _write(tmp_path, "name: q\nengine: vllm\nport: 8000\nvllm:\n" "  model: Qwen/Qwen3-32B\n  tensor_parallel_size: 2\n  max_model_len: 32768\n" '  extra_args: "--enable-prefix-caching"\n')
     a = get_adapter("vllm")(p, CAPS8)
     a.check_requirements()
     cmd, env = a.build_command()
@@ -36,8 +34,7 @@ def test_vllm_command(tmp_path, monkeypatch):
 
 def test_vllm_fp8_cc_check(tmp_path):
     p = _write(tmp_path, "name: q\nengine: vllm\nport: 8000\nvllm:\n  model: m\n  quantization: fp8\n")
-    a = get_adapter("vllm")(p, Capabilities(gpu_count=8, compute_capability="7.5",
-                                            binaries={"vllm": True}))
+    a = get_adapter("vllm")(p, Capabilities(gpu_count=8, compute_capability="7.5", binaries={"vllm": True}))
     with pytest.raises(RequirementError, match="8.9"):
         a.check_requirements()
 
@@ -50,8 +47,7 @@ def test_vllm_tp_exceeds(tmp_path):
 
 
 def test_sglang_command(tmp_path):
-    p = _write(tmp_path, "name: s\nengine: sglang\nport: 30000\nsglang:\n"
-               "  model: Qwen/Qwen3-32B\n  tensor_parallel_size: 4\n")
+    p = _write(tmp_path, "name: s\nengine: sglang\nport: 30000\nsglang:\n" "  model: Qwen/Qwen3-32B\n  tensor_parallel_size: 4\n")
     a = get_adapter("sglang")(p, CAPS8)
     a.check_requirements()
     cmd, _ = a.build_command()

@@ -35,12 +35,14 @@ class Profile:
 def _interpolate(value: Any, source: str) -> Any:
     """递归地对字符串、字典、列表进行 ${VAR} 环境变量插值。"""
     if isinstance(value, str):
+
         def _sub(m: re.Match) -> str:
             var = m.group(1)
             env_val = os.environ.get(var)
             if env_val is None or env_val == "":
                 raise ProfileError(f"{source}：插值变量 {var} 未在环境变量/.env 中定义")
             return env_val
+
         return _VAR_RE.sub(_sub, value)
     if isinstance(value, dict):
         return {k: _interpolate(v, source) for k, v in value.items()}
@@ -65,9 +67,13 @@ def _to_profile(raw: dict[str, Any], path: Path) -> Profile:
     if not isinstance(engine_config, dict):
         raise ProfileError(f"{src}：{engine} 段必须是映射")
     return Profile(
-        name=str(raw["name"]), engine=engine, port=port,
+        name=str(raw["name"]),
+        engine=engine,
+        port=port,
         api_key=raw.get("api_key") or None,
-        engine_config=engine_config, usage=raw.get("usage") or {}, path=path,
+        engine_config=engine_config,
+        usage=raw.get("usage") or {},
+        path=path,
     )
 
 

@@ -44,9 +44,7 @@ def test_build_command(tmp_path):
 
 def test_dspark_disabled_when_no_draft(tmp_path):
     (tmp_path / "m.gguf").write_bytes(b"0" * 1024)
-    (tmp_path / "ds.yaml").write_text(
-        f"name: ds\nengine: llamacpp\nport: 18888\nllamacpp:\n  model: {tmp_path}/m.gguf\n  gpu_count: 8\n",
-        encoding="utf-8")
+    (tmp_path / "ds.yaml").write_text(f"name: ds\nengine: llamacpp\nport: 18888\nllamacpp:\n  model: {tmp_path}/m.gguf\n  gpu_count: 8\n", encoding="utf-8")
     caps = probe(nvidia_smi_output=SMI)
     adapter = get_adapter("llamacpp")(load_profile("ds", tmp_path), caps)
     adapter.check_requirements()
@@ -56,8 +54,7 @@ def test_dspark_disabled_when_no_draft(tmp_path):
 
 
 def test_gpu_count_exceeds_hw(tmp_path):
-    caps = probe(nvidia_smi_output="\n".join(
-        ["RTX 5880 Ada Generation, 49140, 48000, 580.65.05, 8.9"] * 2))
+    caps = probe(nvidia_smi_output="\n".join(["RTX 5880 Ada Generation, 49140, 48000, 580.65.05, 8.9"] * 2))
     adapter = get_adapter("llamacpp")(_profile(tmp_path), caps)
     with pytest.raises(RequirementError, match="GPU"):
         adapter.check_requirements()

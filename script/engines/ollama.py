@@ -48,11 +48,8 @@ class OllamaAdapter(EngineAdapter):
             pass
 
     def _call_generate(self, keep_alive) -> None:
-        body = json.dumps({"model": self.profile.engine_config["model"],
-                           "keep_alive": keep_alive}).encode()
-        req = urllib.request.Request(
-            f"http://127.0.0.1:{self.profile.port}/api/generate",
-            data=body, headers={"Content-Type": "application/json"})
+        body = json.dumps({"model": self.profile.engine_config["model"], "keep_alive": keep_alive}).encode()
+        req = urllib.request.Request(f"http://127.0.0.1:{self.profile.port}/api/generate", data=body, headers={"Content-Type": "application/json"})
         urllib.request.urlopen(req, timeout=600).read()
 
     def metrics_mapping(self) -> None:

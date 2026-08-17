@@ -29,6 +29,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+
 def _fmt_int(value: float) -> str:
     """千分位格式化整数。"""
     return f"{int(round(value)):,}"
@@ -39,13 +40,7 @@ def _build_patterns(mapping: dict[str, list[str]]) -> dict[str, list[re.Pattern]
 
     匹配形如 "name 123" 或 "name{label=\"x\"} 123" 的 Prometheus 采样行。
     """
-    return {
-        key: [
-            re.compile(r"^" + re.escape(name) + r"(?:\{[^}]*\})?\s+([0-9.eE+-]+)$", re.MULTILINE)
-            for name in names
-        ]
-        for key, names in mapping.items()
-    }
+    return {key: [re.compile(r"^" + re.escape(name) + r"(?:\{[^}]*\})?\s+([0-9.eE+-]+)$", re.MULTILINE) for name in names] for key, names in mapping.items()}
 
 
 def parse_metrics(text: str, mapping: dict[str, list[str]]) -> dict[str, float]:
@@ -128,8 +123,7 @@ class UsageCollector:
     mode="on-demand"：不启动后台线程，由 get_snapshot() 在每次请求时同步拉取。
     """
 
-    def __init__(self, base_url: str, poll_interval: float, api_key: str | None,
-                 mode: str = "poll", mapping: dict[str, list[str]] | None = None) -> None:
+    def __init__(self, base_url: str, poll_interval: float, api_key: str | None, mode: str = "poll", mapping: dict[str, list[str]] | None = None) -> None:
         self.base_url = base_url.rstrip("/")
         self.poll_interval = poll_interval
         self.api_key = api_key
@@ -270,8 +264,7 @@ def run_server(targets: list[StatsTarget]) -> None:
     collectors: dict[str, UsageCollector] = {}
     for target in targets:
         if target.mapping is not None:
-            collector = UsageCollector(target.metrics_url, poll_interval, target.api_key,
-                                       mode=mode, mapping=target.mapping)
+            collector = UsageCollector(target.metrics_url, poll_interval, target.api_key, mode=mode, mapping=target.mapping)
             collector.start()
             collectors[target.name] = collector
 
@@ -302,13 +295,15 @@ def _targets_from_profiles() -> list[StatsTarget]:
     targets: list[StatsTarget] = []
     for profile in list_profiles():
         adapter = get_adapter(profile.engine)(profile, None)
-        targets.append(StatsTarget(
-            name=profile.name,
-            metrics_url=f"http://127.0.0.1:{profile.port}/metrics",
-            mapping=adapter.metrics_mapping(),
-            usage_cfg=profile.usage,
-            api_key=profile.api_key,
-        ))
+        targets.append(
+            StatsTarget(
+                name=profile.name,
+                metrics_url=f"http://127.0.0.1:{profile.port}/metrics",
+                mapping=adapter.metrics_mapping(),
+                usage_cfg=profile.usage,
+                api_key=profile.api_key,
+            )
+        )
     return targets
 
 

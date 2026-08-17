@@ -10,7 +10,7 @@ from core.envfile import parse_env_file, load_env  # noqa: E402
 
 def test_parse_env_file_basic(tmp_path):
     p = tmp_path / ".env"
-    p.write_text('# 注释\nFOO=bar\nEMPTY=\nQUOTED="a b"\nSINGLE=\'x\'\n', encoding="utf-8")
+    p.write_text("# 注释\nFOO=bar\nEMPTY=\nQUOTED=\"a b\"\nSINGLE='x'\n", encoding="utf-8")
     assert parse_env_file(p) == {"FOO": "bar", "EMPTY": "", "QUOTED": "a b", "SINGLE": "x"}
 
 
