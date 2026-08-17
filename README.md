@@ -1,15 +1,15 @@
-# DeepSeek-V4-Flash 服务启动工具
+# modelctl — 多模型部署启动器
 
-在 CUDA/Ada GPU 上通过**官方 llama.cpp** 启动 DeepSeek-V4-Flash-0731 GGUF，提供 OpenAI 兼容接口，并集成 **DSpark 投机解码**（约 1.5x-1.9x 解码加速）。
+在 CUDA/Ada GPU 上通过**引擎插件式架构**启动多种模型服务（llamacpp / ollama / vllm / sglang），每模型一个 YAML profile，统一 CLI 管理启动、停止、重启、状态与用量统计。
 
 ## 特性
 
-- 自动编译官方 llama.cpp（CUDA）并启动 `llama-server`
-- 支持从 ModelScope 按量化版本按需下载 GGUF 分片（`--download`）
-- DSpark 投机解码（自动发现/指定草稿模型）
-- 上下文自动分配：默认**每个并发槽位 1M 上下文**（总 ctx = `PARALLEL × 1048576`），可手动覆盖
-- 配置外置：全部参数通过 `.env` 管理，命令行参数可覆盖
-- 支持前后台两种启动方式，日志自动落盘
+- **多引擎支持**：llamacpp（官方 llama.cpp + DSpark 投机解码）、ollama、vllm、sglang
+- **YAML profile**：每模型一个 `models/<name>.yaml`，配置模型路径、端口、引擎参数、用量单价
+- **能力探测与自动降级**：启动前探测 GPU/CC/显存/引擎二进制，硬性不满足拒绝启动并说明原因，可降级项自动降级并告警
+- **统一生命周期**：后台启动、PID 管理、健康检查、优雅停止
+- **用量统计**：`/api/usage` 输出与 cc-switch 兼容，支持多模型按 `?model=` 路由
+- **配置外置**：全局配置通过 `.env` 管理，模型级配置通过 profile YAML 管理
 
 ## 目录结构
 
@@ -19,9 +19,15 @@ deepseek-v4-flash/
 ├── docs/
 │   └── DeepSeek-V4-Flash后台启动指南.md   # 部署与运维详细指南
 ├── script/
-│   ├── start_v4_flash_gguf.py      # 主启动脚本（构建 + 启动 llama-server）
-│   └── start_v4_flash_background.sh # 后台启动脚本（推荐）
-├── .env.example                    # 配置模板（复制为 .env 后修改）
+│   ├── modelctl.py                 # 统一 CLI 入口（start/stop/restart/status/list/probe/stats）
+│   ├── modelctl.sh                 # bash 薄封装（推荐入口）
+│   ├── core/                       # 核心模块：envfile / profile / capabilities / process / stats
+│   └── engines/                    # 引擎适配器：base / llamacpp / ollama / vllm / sglang
+├── models/                         # 模型 profile（每模型一个 YAML）
+│   ├── deepseek-v4.yaml            # DeepSeek-V4-Flash（llamacpp + DSpark）
+│   ├── qwen3-ollama.yaml           # Qwen3-32B（ollama）
+│   └── qwen3-vllm.yaml             # Qwen3-32B（vllm）
+├── .env.example                    # 全局配置模板（复制为 .env 后修改）
 ├── .env                            # 本地配置（含密钥，不入库）
 ├── .gitignore
 └── pyproject.toml
@@ -31,80 +37,81 @@ deepseek-v4-flash/
 
 ### 1. 安装依赖
 
-- Python 3.10+（运行期零第三方依赖，`.env` 解析内置实现）
-- `git`、`cmake`、CUDA 工具链、`nvidia-smi`、`tee`
+- Python 3.12+、PyYAML
+- `git`、`cmake`、CUDA 工具链、`nvidia-smi`（llamacpp 引擎编译用）
+- 各引擎二进制：`ollama` / `vllm` / `sglang`（按需安装）
 
-### 2. 配置 .env
+### 2. 配置 .env 与 profile
 
 ```bash
 cp .env.example .env
-vi .env        # 修改模型路径、端口、API 密钥等
+vi .env        # 修改 API 密钥、存储目录、日志目录等全局配置
 ```
 
-配置优先级：**命令行参数 > 环境变量 > .env 文件 > 脚本内置默认值**。
+模型级配置（模型路径、端口、并行度、量化等）在 `models/*.yaml` 中修改。
+
+配置优先级：**profile YAML > 环境变量 > .env 文件 > 代码默认值**。
 
 ### 3. 启动服务
 
-前台（首次运行会自动编译 llama.cpp 并启动）：
-
 ```bash
-python3 script/start_v4_flash_gguf.py
+# 启动 DeepSeek-V4-Flash（llamacpp，首次运行会自动编译 llama.cpp 并下载模型）
+bash script/modelctl.sh start deepseek-v4
+
+# 启动 Qwen3（ollama）
+bash script/modelctl.sh start qwen3-ollama
+
+# 启动 Qwen3（vllm）
+bash script/modelctl.sh start qwen3-vllm
 ```
 
-后台（推荐，SSH 断开不影响；需先编译好，见下方说明）：
+也可直接调用 Python 入口：
 
 ```bash
-bash script/start_v4_flash_background.sh
+python3 script/modelctl.py start deepseek-v4
 ```
 
 ### 4. 验证
 
 ```bash
-curl http://127.0.0.1:18888/health
+curl http://127.0.0.1:18888/health   # deepseek-v4
+curl http://127.0.0.1:11434/         # qwen3-ollama
+curl http://127.0.0.1:8000/health    # qwen3-vllm
 ```
 
-返回 `{"status":"ok"}` 即成功。接口地址：`http://127.0.0.1:18888/v1/chat/completions`。
-
-### 5. 停止 / 重启 / 查看日志
-
-推荐直接用启动脚本统一管理（会同时处理 llama-server 与用量统计服务）：
+### 5. 停止 / 重启 / 状态
 
 ```bash
-# 启动（默认）
-bash script/start_v4_flash_background.sh
-
-# 停止服务（llama-server + 用量统计服务）
-bash script/start_v4_flash_background.sh stop
+# 停止
+bash script/modelctl.sh stop deepseek-v4
 
 # 重启（先停后启）
-bash script/start_v4_flash_background.sh restart
+bash script/modelctl.sh restart deepseek-v4
 
-# 查看运行状态
-curl http://127.0.0.1:18888/health
+# 查看所有模型状态（含健康检查）
+bash script/modelctl.sh status
+
+# 列出所有 profile
+bash script/modelctl.sh list
+
+# 探测硬件与引擎二进制可用性
+bash script/modelctl.sh probe
 ```
 
-如需手动操作，可查看相关进程与 PID：
+### 6. 用量统计服务
 
 ```bash
-pgrep -af "start_v4_flash_gguf|llama-server|usage_stats_server"
+# 启动用量统计服务（/api/usage，cc-switch 兼容）
+bash script/modelctl.sh stats start
 
-# 按端口一键杀死 llama-server（18888）与用量统计服务（5002）
-fuser -k 18888/tcp
-fuser -k 5002/tcp
-pkill -f usage_stats_server.py      # 兜底：按进程名停止用量统计服务（如端口命令未生效）
-
-# 或按进程名停止（效果同上）
-# pkill -f "start_v4_flash_gguf.py"
-# pkill -f "usage_stats_server.py"
-# pkill -x llama-server
+# 停止用量统计服务
+bash script/modelctl.sh stats stop
 ```
 
 查看日志（LOG_DIR 默认 = 项目根目录上级的 `../logs/`）：
 
 ```bash
-tail -f ../logs/llama-server-18888-*.log   # llama-server 服务日志
-tail -f ../logs/usage-stats.log            # 用量统计服务日志
-tail -f ../logs/launch-*.log               # 最近一次启动日志
+tail -f ../logs/launch-deepseek-v4-*.log   # 最近一次启动日志
 ```
 
 ## 文档
@@ -113,6 +120,6 @@ tail -f ../logs/launch-*.log               # 最近一次启动日志
 
 ## 说明
 
-- 默认使用 **UD-Q8_K_XL 无损量化**；显存吃紧可换 `UD-Q4_K_XL`（近无损），修改 `.env` 的 `MODEL` 即可
+- 模型级配置（模型路径、端口、并行度、量化、用量单价）在 `models/*.yaml` 中管理，全局配置（API 密钥、存储目录、日志目录、统计服务）在 `.env` 中管理
 - `.env` 含 API 密钥等敏感信息，已加入 `.gitignore`，请勿提交
 - 详细注意事项（KV cache 量化、DSpark 参数、NCCL 优化等）见上方文档

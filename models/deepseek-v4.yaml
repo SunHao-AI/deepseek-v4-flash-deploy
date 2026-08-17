@@ -1,0 +1,28 @@
+# DeepSeek-V4-Flash-0731（官方 llama.cpp + DSpark）
+name: deepseek-v4
+engine: llamacpp
+port: 18888
+api_key: ${API_KEY}
+
+llamacpp:
+  model: /raid5/sh/model/model-gguf/DeepSeek-V4-Flash-0731-GGUF/UD-Q8_K_XL/DeepSeek-V4-Flash-0731-UD-Q8_K_XL-00001-of-00005.gguf
+  draft: ""                # 留空自动发现 dspark*.gguf
+  parallel: 2
+  ctx_size: ""             # 留空 = parallel × 1M
+  reasoning: on
+  reasoning_format: deepseek
+  dspark: on
+  spec_type: draft-dspark
+  spec_draft_n_max: 3
+  n_gpu_layers_draft: 999
+  cache_type_k: q8_0
+  cache_type_v: q8_0
+  gpu_count: 8
+  fit: off
+  download:
+    modelscope_id: unsloth/DeepSeek-V4-Flash-0731-GGUF
+    quant: UD-Q8_K_XL
+
+usage:
+  price_in: 1.0
+  price_out: 2.0

@@ -1,0 +1,10 @@
+# qwen3-ollama.yaml
+name: qwen3-ollama
+engine: ollama
+port: 11434
+
+ollama:
+  model: qwen3:32b
+  keep_alive: -1
+  num_parallel: 2
+  context_length: 32768

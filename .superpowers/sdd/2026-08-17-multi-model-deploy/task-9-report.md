@@ -31,3 +31,14 @@
 ## 备注
 - 未修改 Task 1-8 已完成的文件。
 - `stats start` 后台进程通过 `python -m core.stats` 独立入口从 `models/*.yaml` 构造统计目标（core/stats.py 已提供 `_targets_from_profiles`），与计划"收集 is_running profile 构造 StatsTarget"的意图一致。
+
+## Fix Round 1（审查修复）
+- **问题**：`_cmd_stats_start` 中构建的 `targets` 列表（过滤 is_running 的 profile）从未被使用——后台进程实际通过 `[sys.executable, "-m", "core.stats"]` 独立启动，其内部 `_targets_from_profiles()` 会加载所有 profile（含未运行的），而非传入的 targets。后果：① targets 循环是纯死代码；② 统计服务会包含未运行模型（显示为不可用）。
+- **修复**（仅改 `script/modelctl.py`）：
+  1. 删除 `_cmd_stats_start` 中未使用的 `targets` 构建死代码。
+  2. 在函数内添加中文注释，明确 stats 后台进程依赖 `core.stats._targets_from_profiles()`（加载全部 profile，未运行的返回不可用状态），这是计划"独立进程入口"的合理实现。
+  3. 因死代码移除后 `models_dir`/`caps` 参数不再使用，将签名简化为 `_cmd_stats_start()` 并同步更新调用点；同时移除不再使用的 `StatsTarget` 导入。
+  4. 保持 stats start|stop 对外行为不变（start 后台化 `[sys.executable, "-m", "core.stats"]`；stop 用 `stop_instance("usage-stats", USAGE_PORT, ["core.stats"])`）。
+- **覆盖测试**：`python -m pytest tests/test_modelctl.py -v` → **3 passed**。
+- **全量回归**：`python -m pytest tests/ -v` → **60 passed**。
+- **提交**：commit `bad4946`：`fix(cli): 移除 stats start 死代码，明确独立进程入口设计`（仅含 `script/modelctl.py`）。

@@ -1,0 +1,16 @@
+# qwen3-vllm.yaml
+name: qwen3-vllm
+engine: vllm
+port: 8000
+api_key: ${API_KEY}
+
+vllm:
+  model: Qwen/Qwen3-32B
+  tensor_parallel_size: 2
+  max_model_len: 32768
+  gpu_memory_utilization: 0.9
+  extra_args: ""
+
+usage:
+  price_in: 0.5
+  price_out: 1.0
