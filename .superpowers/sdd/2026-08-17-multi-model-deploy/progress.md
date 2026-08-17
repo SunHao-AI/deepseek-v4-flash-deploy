@@ -23,5 +23,5 @@ Task 9: complete (commit 7f44dd6)
 Task 9: fix round 1/5 (1 addressed, 0 open — stats start 死代码; commits 7f44dd6..bad4946)
 Task 9: complete (commits 99a2c37..bad4946, review clean)
 
-Task 10: complete (commit <TBD>, review pending)
+Task 10: complete (commit 7472cf2, review pending)
 
