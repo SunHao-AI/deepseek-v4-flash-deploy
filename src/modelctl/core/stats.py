@@ -29,6 +29,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+USAGE_PORT = 5002
+
 
 def _fmt_int(value: float) -> str:
     """千分位格式化整数。"""
@@ -257,7 +259,7 @@ def run_server(targets: list[StatsTarget]) -> None:
     USAGE_MODE（poll/on-demand）、USAGE_POLL_INTERVAL（默认 5）。
     """
     host = os.environ.get("USAGE_HOST", "0.0.0.0")
-    port = int(os.environ.get("USAGE_PORT", "5002"))
+    port = int(os.environ.get("USAGE_PORT", str(USAGE_PORT)))
     mode = os.environ.get("USAGE_MODE", "poll")
     poll_interval = float(os.environ.get("USAGE_POLL_INTERVAL", "5"))
 

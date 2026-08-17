@@ -28,11 +28,9 @@ from modelctl.core.envfile import load_env
 from modelctl.core.logging import setup_logging
 from modelctl.core.process import is_running, launch_log, pid_file, start_detached, stop_instance, tail_file, wait_health
 from modelctl.core.profile import ProfileError, list_profiles, load_profile
+from modelctl.core.stats import USAGE_PORT
 from modelctl.engines import get_adapter
 from modelctl.engines.base import RequirementError
-
-# 默认统计服务端口（与 core/stats.py 的 USAGE_PORT 默认值一致）
-DEFAULT_USAGE_PORT = 5002
 
 
 def _extract_models_dir(argv: list[str]) -> tuple[Path | None, list[str]]:
@@ -194,21 +192,21 @@ def _cmd_stats_start() -> int:
     if is_running("usage-stats"):
         logger.info("用量统计服务已在运行")
         return 0
-    # 后台独立进程：python -m core.stats。统计目标由 core.stats 的
-    # _targets_from_profiles() 从 models/*.yaml 加载全部 profile 构造——
-    # 未运行的模型会返回不可用状态（isValid=False），而非在此过滤。
+    # 后台独立进程：python -m modelctl.core.stats。统计目标由
+    # modelctl.core.stats 的 _targets_from_profiles() 从 models/*.yaml 加载全部
+    # profile 构造——未运行的模型会返回不可用状态（isValid=False），而非在此过滤。
     # 这是计划"独立进程入口"的合理实现，故此处不预构造 targets。
     script_dir = str(Path(__file__).resolve().parent)
     extra_env = {"PYTHONPATH": script_dir + os.pathsep + os.environ.get("PYTHONPATH", "")}
-    pid = start_detached("usage-stats", [sys.executable, "-m", "core.stats"], extra_env)
-    port = int(os.environ.get("USAGE_PORT", str(DEFAULT_USAGE_PORT)))
+    pid = start_detached("usage-stats", [sys.executable, "-m", "modelctl.core.stats"], extra_env)
+    port = int(os.environ.get("USAGE_PORT", str(USAGE_PORT)))
     logger.info(f"用量统计服务已启动（PID {pid}），监听端口 {port}")
     return 0
 
 
 def _cmd_stats_stop() -> int:
-    port = int(os.environ.get("USAGE_PORT", str(DEFAULT_USAGE_PORT)))
-    stop_instance("usage-stats", port, ["core.stats"])
+    port = int(os.environ.get("USAGE_PORT", str(USAGE_PORT)))
+    stop_instance("usage-stats", port, ["modelctl.core.stats"])
     logger.info("用量统计服务已停止")
     return 0
 

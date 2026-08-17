@@ -6,7 +6,6 @@ from __future__ import annotations
 import os
 import signal
 import subprocess
-import sys
 import time
 import urllib.error
 import urllib.request
@@ -37,8 +36,7 @@ def start_detached(name: str, command: list[str], extra_env: dict[str, str]) -> 
     env = {**os.environ, **extra_env}
     fp = open(log_path, "a", encoding="utf-8")
     kwargs: dict = {"stdout": fp, "stderr": subprocess.STDOUT, "env": env, "stdin": subprocess.DEVNULL}
-    if sys.platform != "win32":
-        kwargs["start_new_session"] = True  # nohup 语义：SSH 断开不影响
+    kwargs["start_new_session"] = True  # nohup 语义：SSH 断开不影响
     proc = subprocess.Popen(command, **kwargs)
     pid_file(name).write_text(str(proc.pid), encoding="utf-8")
     return proc.pid
@@ -52,9 +50,6 @@ def is_running(name: str) -> bool:
         pid = int(pf.read_text(encoding="utf-8").strip())
     except ValueError:
         return False
-    if sys.platform == "win32":
-        r = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"], capture_output=True, text=True)
-        return str(pid) in r.stdout
     try:
         os.kill(pid, 0)
         return True
@@ -69,27 +64,23 @@ def stop_instance(name: str, port: int, patterns: list[str]) -> bool:
     if pf.is_file():
         try:
             pid = int(pf.read_text(encoding="utf-8").strip())
-            if sys.platform == "win32":
-                subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
+            os.killpg(pid, signal.SIGTERM)
+            deadline = time.time() + 10
+            while time.time() < deadline:
+                try:
+                    os.kill(pid, 0)
+                    time.sleep(0.5)
+                except OSError:
+                    break
             else:
-                os.killpg(pid, signal.SIGTERM)
-                deadline = time.time() + 10
-                while time.time() < deadline:
-                    try:
-                        os.kill(pid, 0)
-                        time.sleep(0.5)
-                    except OSError:
-                        break
-                else:
-                    os.killpg(pid, signal.SIGKILL)
+                os.killpg(pid, signal.SIGKILL)
             stopped = True
         except (ValueError, OSError):
             pass
         pf.unlink(missing_ok=True)
-    if sys.platform != "win32":
-        subprocess.run(["fuser", "-k", f"{port}/tcp"], capture_output=True)
-        for pat in patterns:
-            subprocess.run(["pkill", "-f", pat], capture_output=True)
+    subprocess.run(["fuser", "-k", f"{port}/tcp"], capture_output=True)
+    for pat in patterns:
+        subprocess.run(["pkill", "-f", pat], capture_output=True)
     return stopped
 
 
