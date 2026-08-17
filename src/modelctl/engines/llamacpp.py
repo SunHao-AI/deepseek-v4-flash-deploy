@@ -29,9 +29,9 @@ def run(command: list[str], *, cwd: Path | None = None) -> None:
 
 
 def require(name: str) -> None:
-    """校验 PATH 中存在指定可执行文件，否则退出。"""
+    """校验 PATH 中存在指定可执行文件，否则抛出 RequirementError。"""
     if shutil.which(name) is None:
-        raise SystemExit(f"缺少 {name}。请安装后再运行脚本。")
+        raise RequirementError(f"缺少 {name}。请安装后再运行脚本。")
 
 
 def find_server(source: Path) -> Path:
@@ -80,7 +80,7 @@ def download_gguf(modelscope_id: str, model_root: Path, quant: str, want_dspark:
             allow_file_pattern=patterns,
         )
     except Exception as error:
-        raise SystemExit(
+        raise RequirementError(
             f"ModelScope 下载失败。该 0731 GGUF 镜像可能尚未同步 {quant} 分片，或需要登录。\n"
             f"模型 ID：{modelscope_id}\n"
             "可尝试指定实际镜像 ID，或从可访问 Hugging Face 的机器下载后配置 model。"
@@ -89,7 +89,7 @@ def download_gguf(modelscope_id: str, model_root: Path, quant: str, want_dspark:
     # ModelScope 保留仓库的 <quant>/ 子目录，分片不一定直接位于 destination 下。
     model_match = _find_first(destination, [f"*{quant}*-00001-of-*.gguf", f"*{quant}*.gguf"])
     if model_match is None:
-        raise SystemExit(f"下载结束，但未找到 {quant} 的首分片：{destination}\n" "请检查 ModelScope 仓库中的实际量化名称；脚本没有下载官方 safetensors 权重。")
+        raise RequirementError(f"下载结束，但未找到 {quant} 的首分片：{destination}\n" "请检查 ModelScope 仓库中的实际量化名称；脚本没有下载官方 safetensors 权重。")
 
     draft_match = None
     if want_dspark:
