@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from loguru import logger
+
 from modelctl.core.capabilities import free_vram_total_mb
 from modelctl.core.envfile import PROJECT_ROOT
 from modelctl.engines.base import EngineAdapter, RequirementError
@@ -22,7 +24,7 @@ CTX_PER_SLOT = 1_048_576
 # --- 原样搬运自 start_v4_flash_gguf.py ---
 def run(command: list[str], *, cwd: Path | None = None) -> None:
     """执行命令，失败时抛出 CalledProcessError。"""
-    print("\n$ " + " ".join(command), flush=True)
+    logger.info("\n$ " + " ".join(command))
     subprocess.run(command, cwd=cwd, check=True)
 
 
@@ -70,7 +72,7 @@ def download_gguf(modelscope_id: str, model_root: Path, quant: str, want_dspark:
     if want_dspark:
         patterns.extend(DSPARK_PATTERNS)
 
-    print(f"从 ModelScope 下载 {modelscope_id} 的 {quant} 分片（{', '.join(patterns)}）：{destination}")
+    logger.info(f"从 ModelScope 下载 {modelscope_id} 的 {quant} 分片（{', '.join(patterns)}）：{destination}")
     try:
         snapshot_download(
             model_id=modelscope_id,
@@ -93,14 +95,13 @@ def download_gguf(modelscope_id: str, model_root: Path, quant: str, want_dspark:
     if want_dspark:
         draft_match = _find_first(destination, DSPARK_PATTERNS)
         if draft_match is None:
-            print(
+            logger.warning(
                 f"\n警告：未在 {destination} 下找到 DSpark 草稿文件（{'、'.join(DSPARK_PATTERNS)}）。\n"
                 "DSpark 将不会启用；请确认 ModelScope 镜像已同步 dspark-DeepSeek-V4-Flash-0731-Q8_0.gguf，\n"
-                "或改用 Hugging Face 手动下载后通过 draft 指定。\n",
-                flush=True,
+                "或改用 Hugging Face 手动下载后通过 draft 指定。\n"
             )
         else:
-            print(f"找到 DSpark 草稿：{draft_match}")
+            logger.info(f"找到 DSpark 草稿：{draft_match}")
 
     return model_match, draft_match
 

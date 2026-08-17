@@ -21,8 +21,11 @@ import os
 import sys
 from pathlib import Path
 
+from loguru import logger
+
 from modelctl.core.capabilities import probe
 from modelctl.core.envfile import load_env
+from modelctl.core.logging import setup_logging
 from modelctl.core.process import is_running, launch_log, pid_file, start_detached, stop_instance, tail_file, wait_health
 from modelctl.core.profile import ProfileError, list_profiles, load_profile
 from modelctl.engines import get_adapter
@@ -105,40 +108,40 @@ def _cmd_start(args, models_dir: Path | None, caps) -> int:
     adapter = get_adapter(profile.engine)(profile, caps)
     adapter.check_requirements()
     for warning in adapter.warnings:
-        print(f"警告: {warning}")
+        logger.warning(warning)
     adapter.pre_start()
     cmd, env = adapter.build_command()
     pid = start_detached(name, cmd, env)
-    print(f"已启动 {name}（PID {pid}），等待健康检查（超时 {args.timeout:g}s）...")
+    logger.info(f"已启动 {name}（PID {pid}），等待健康检查（超时 {args.timeout:g}s）...")
     if wait_health(adapter.health_url(), args.timeout, profile.api_key):
         adapter.post_start()
         log = launch_log(name)
-        print(f"启动成功：{name} 运行于 http://127.0.0.1:{profile.port}")
+        logger.info(f"启动成功：{name} 运行于 http://127.0.0.1:{profile.port}")
         if log is not None:
-            print(f"日志：{log}")
+            logger.info(f"日志：{log}")
         if profile.usage or adapter.metrics_mapping() is not None:
-            print("提示：用量统计可通过 `modelctl stats start` 启动")
+            logger.info("提示：用量统计可通过 `modelctl stats start` 启动")
         return 0
     log = launch_log(name)
     if log is not None:
-        print(f"健康检查超时，日志尾部 50 行（{log}）：")
-        print(tail_file(log, 50))
+        logger.warning(f"健康检查超时，日志尾部 50 行（{log}）：")
+        logger.warning(tail_file(log, 50))
     else:
-        print("健康检查超时，且未找到启动日志")
+        logger.warning("健康检查超时，且未找到启动日志")
     return 1
 
 
 def _cmd_stop(args, models_dir: Path | None, caps) -> int:
     profile = load_profile(args.name, models_dir)
     _stop_profile(profile, caps, models_dir)
-    print(f"已停止：{profile.name}")
+    logger.info(f"已停止：{profile.name}")
     return 0
 
 
 def _cmd_restart(args, models_dir: Path | None, caps) -> int:
     profile = load_profile(args.name, models_dir)
     _stop_profile(profile, caps, models_dir)
-    print(f"已停止：{profile.name}，正在重新启动...")
+    logger.info(f"已停止：{profile.name}，正在重新启动...")
     return _cmd_start(args, models_dir, caps)
 
 
@@ -147,7 +150,7 @@ def _cmd_status(args, models_dir: Path | None, caps) -> int:
     if args.name:
         profiles = [p for p in profiles if p.name == args.name]
         if not profiles:
-            print(f"未找到 profile：{args.name}")
+            logger.warning(f"未找到 profile：{args.name}")
             return 0
     print(f"{'名称':<12} {'引擎':<10} {'端口':<6} {'状态':<8} 健康")
     for p in profiles:
@@ -211,6 +214,7 @@ def _cmd_stats_stop() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    setup_logging()
     argv = list(sys.argv[1:] if argv is None else argv)
     models_dir, rest = _extract_models_dir(argv)
     load_env()
@@ -234,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "stats":
             return _cmd_stats_start() if args.action == "start" else _cmd_stats_stop()
     except (ProfileError, RequirementError) as error:
-        print(f"错误: {error}")
+        logger.error(str(error))
         return 2
     return 0
 
