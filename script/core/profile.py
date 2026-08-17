@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""core/profile.py — 模型 profile（models/<name>.yaml）加载、${VAR} 插值与校验。"""
+from __future__ import annotations
+
+import os
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from core.envfile import PROJECT_ROOT
+
+KNOWN_ENGINES = {"llamacpp", "ollama", "vllm", "sglang"}
+_VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+class ProfileError(ValueError):
+    """profile 校验或插值失败。"""
+
+
+@dataclass
+class Profile:
+    name: str
+    engine: str
+    port: int
+    api_key: str | None = None
+    engine_config: dict[str, Any] = field(default_factory=dict)
+    usage: dict[str, Any] = field(default_factory=dict)
+    path: Path | None = None
+
+
+def _interpolate(value: Any, source: str) -> Any:
+    """递归地对字符串、字典、列表进行 ${VAR} 环境变量插值。"""
+    if isinstance(value, str):
+        def _sub(m: re.Match) -> str:
+            var = m.group(1)
+            env_val = os.environ.get(var)
+            if env_val is None or env_val == "":
+                raise ProfileError(f"{source}：插值变量 {var} 未在环境变量/.env 中定义")
+            return env_val
+        return _VAR_RE.sub(_sub, value)
+    if isinstance(value, dict):
+        return {k: _interpolate(v, source) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_interpolate(v, source) for v in value]
+    return value
+
+
+def _to_profile(raw: dict[str, Any], path: Path) -> Profile:
+    """将已插值的原始字典转换为 Profile，并执行字段校验。"""
+    src = path.name
+    for key in ("name", "engine", "port"):
+        if key not in raw or raw[key] in (None, ""):
+            raise ProfileError(f"{src}：缺少必填字段 {key}")
+    engine = str(raw["engine"])
+    if engine not in KNOWN_ENGINES:
+        raise ProfileError(f"{src}：未知引擎 {engine}（支持：{sorted(KNOWN_ENGINES)}）")
+    port = int(raw["port"])
+    if not 1 <= port <= 65535:
+        raise ProfileError(f"{src}：port 必须在 1-65535，当前 {port}")
+    engine_config = raw.get(engine) or {}
+    if not isinstance(engine_config, dict):
+        raise ProfileError(f"{src}：{engine} 段必须是映射")
+    return Profile(
+        name=str(raw["name"]), engine=engine, port=port,
+        api_key=raw.get("api_key") or None,
+        engine_config=engine_config, usage=raw.get("usage") or {}, path=path,
+    )
+
+
+def load_profile(name: str, models_dir: Path | None = None) -> Profile:
+    """加载指定 name 的 YAML profile（models_dir/<name>.yaml）。"""
+    models_dir = models_dir or PROJECT_ROOT / "models"
+    path = models_dir / f"{name}.yaml"
+    if not path.is_file():
+        raise ProfileError(f"profile 不存在：{path}")
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        raise ProfileError(f"{path.name}：YAML 语法错误：{e}") from e
+    if not isinstance(raw, dict):
+        raise ProfileError(f"{path.name}：顶层必须是映射")
+    return _to_profile(_interpolate(raw, path.name), path)
+
+
+def list_profiles(models_dir: Path | None = None) -> list[Profile]:
+    """按文件名排序加载 models_dir 下所有 *.yaml profile。"""
+    models_dir = models_dir or PROJECT_ROOT / "models"
+    if not models_dir.is_dir():
+        return []
+    return [load_profile(p.stem, models_dir) for p in sorted(models_dir.glob("*.yaml"))]
