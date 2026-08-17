@@ -7,11 +7,14 @@ from core.profile import ProfileError
 from engines.base import EngineAdapter
 from engines.llamacpp import LlamaCppAdapter
 from engines.ollama import OllamaAdapter
+from engines.sglang import SglangAdapter
+from engines.vllm import VllmAdapter
 
 _REGISTRY: dict[str, type[EngineAdapter]] = {
     "llamacpp": LlamaCppAdapter,
     "ollama": OllamaAdapter,
-    # vllm / sglang 在后续任务注册
+    "vllm": VllmAdapter,
+    "sglang": SglangAdapter,
 }
 
 
