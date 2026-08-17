@@ -192,7 +192,7 @@ def _cmd_probe(args, models_dir: Path | None, caps) -> int:
 
 def _cmd_stats_start() -> int:
     if is_running("usage-stats"):
-        print("用量统计服务已在运行")
+        logger.info("用量统计服务已在运行")
         return 0
     # 后台独立进程：python -m core.stats。统计目标由 core.stats 的
     # _targets_from_profiles() 从 models/*.yaml 加载全部 profile 构造——
@@ -202,14 +202,14 @@ def _cmd_stats_start() -> int:
     extra_env = {"PYTHONPATH": script_dir + os.pathsep + os.environ.get("PYTHONPATH", "")}
     pid = start_detached("usage-stats", [sys.executable, "-m", "core.stats"], extra_env)
     port = int(os.environ.get("USAGE_PORT", str(DEFAULT_USAGE_PORT)))
-    print(f"用量统计服务已启动（PID {pid}），监听端口 {port}")
+    logger.info(f"用量统计服务已启动（PID {pid}），监听端口 {port}")
     return 0
 
 
 def _cmd_stats_stop() -> int:
     port = int(os.environ.get("USAGE_PORT", str(DEFAULT_USAGE_PORT)))
     stop_instance("usage-stats", port, ["core.stats"])
-    print("用量统计服务已停止")
+    logger.info("用量统计服务已停止")
     return 0
 
 
