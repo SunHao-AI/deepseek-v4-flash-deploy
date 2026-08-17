@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """engines/vllm.py — vLLM 适配器。"""
+
 from __future__ import annotations
 
 import os
@@ -25,10 +25,19 @@ class VllmAdapter(EngineAdapter):
 
     def build_command(self) -> tuple[list[str], dict[str, str]]:
         cfg = self.profile.engine_config
-        cmd = ["vllm", "serve", str(cfg["model"]),
-               "--host", "0.0.0.0", "--port", str(self.profile.port),
-               "--tensor-parallel-size", str(cfg.get("tensor_parallel_size", 1)),
-               "--gpu-memory-utilization", str(cfg.get("gpu_memory_utilization", 0.9))]
+        cmd = [
+            "vllm",
+            "serve",
+            str(cfg["model"]),
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(self.profile.port),
+            "--tensor-parallel-size",
+            str(cfg.get("tensor_parallel_size", 1)),
+            "--gpu-memory-utilization",
+            str(cfg.get("gpu_memory_utilization", 0.9)),
+        ]
         if cfg.get("max_model_len"):
             cmd += ["--max-model-len", str(cfg["max_model_len"])]
         if cfg.get("quantization"):

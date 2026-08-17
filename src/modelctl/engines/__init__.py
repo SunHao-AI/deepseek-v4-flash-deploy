@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """engines/__init__.py — 引擎注册表。"""
+
 from __future__ import annotations
 
 from modelctl.core.profile import ProfileError

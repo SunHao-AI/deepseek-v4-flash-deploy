@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """modelctl.py — 多模型部署启动器 CLI 入口。
 
 子命令：start <name> [--timeout 300] / stop <name> / restart <name> /
@@ -14,6 +13,7 @@
   ollama profile 在运行时才停掉 serve；否则仅 unload_model + 删除 PID 记录。
 - 错误处理：ProfileError / RequirementError 捕获后打印消息并返回 2。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,7 +26,15 @@ from loguru import logger
 from modelctl.core.capabilities import probe
 from modelctl.core.envfile import load_env
 from modelctl.core.logging import setup_logging
-from modelctl.core.process import is_running, launch_log, pid_file, start_detached, stop_instance, tail_file, wait_health
+from modelctl.core.process import (
+    is_running,
+    launch_log,
+    pid_file,
+    start_detached,
+    stop_instance,
+    tail_file,
+    wait_health,
+)
 from modelctl.core.profile import ProfileError, list_profiles, load_profile
 from modelctl.core.stats import USAGE_PORT
 from modelctl.engines import get_adapter
@@ -90,7 +98,9 @@ def _stop_profile(profile, caps, models_dir: Path | None) -> None:
         # 特判：serve 为共享常驻服务，仅当由本工具拉起且无其他 ollama
         # profile 在运行时才停 serve；否则只卸载模型并清理 PID 记录。
         pf = pid_file(profile.name)
-        other_ollama_running = any(is_running(o.name) for o in list_profiles(models_dir) if o.engine == "ollama" and o.name != profile.name)
+        other_ollama_running = any(
+            is_running(o.name) for o in list_profiles(models_dir) if o.engine == "ollama" and o.name != profile.name
+        )
         if pf.is_file() and not other_ollama_running:
             stop_instance(profile.name, profile.port, [])
         else:

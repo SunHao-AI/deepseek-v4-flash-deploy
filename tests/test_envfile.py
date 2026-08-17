@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 import os
 
-from modelctl.core.envfile import parse_env_file, load_env
+from modelctl.core.envfile import load_env, parse_env_file
 
 
 def test_parse_env_file_basic(tmp_path):

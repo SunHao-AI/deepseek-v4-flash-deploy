@@ -1,4 +1,5 @@
 """loguru 统一日志初始化。"""
+
 from __future__ import annotations
 
 import os

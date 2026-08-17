@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """engines/llamacpp.py — 官方 llama.cpp (GGUF) 适配器，含编译/下载/DSpark。"""
+
 from __future__ import annotations
 
 import importlib.util
@@ -63,7 +63,7 @@ def download_gguf(modelscope_id: str, model_root: Path, quant: str, want_dspark:
     if importlib.util.find_spec("modelscope") is None:
         run([sys.executable, "-m", "pip", "install", "-U", "modelscope"])
 
-    from modelscope import snapshot_download
+    from modelscope import snapshot_download  # type: ignore[import-not-found]
 
     destination = model_root / modelscope_id.rsplit("/", 1)[-1]
     destination.mkdir(parents=True, exist_ok=True)
@@ -89,7 +89,10 @@ def download_gguf(modelscope_id: str, model_root: Path, quant: str, want_dspark:
     # ModelScope 保留仓库的 <quant>/ 子目录，分片不一定直接位于 destination 下。
     model_match = _find_first(destination, [f"*{quant}*-00001-of-*.gguf", f"*{quant}*.gguf"])
     if model_match is None:
-        raise RequirementError(f"下载结束，但未找到 {quant} 的首分片：{destination}\n" "请检查 ModelScope 仓库中的实际量化名称；脚本没有下载官方 safetensors 权重。")
+        raise RequirementError(
+            f"下载结束，但未找到 {quant} 的首分片：{destination}\n"
+            "请检查 ModelScope 仓库中的实际量化名称；脚本没有下载官方 safetensors 权重。"
+        )
 
     draft_match = None
     if want_dspark:
@@ -141,17 +144,18 @@ class LlamaCppAdapter(EngineAdapter):
             need_mb = self._model.stat().st_size / 1024 / 1024 * 1.1
             if need_mb > free_vram_total_mb(self.caps):
                 raise RequirementError(
-                    f"剩余显存不足：模型约需 {need_mb:.0f}MB（×1.1），剩余 {free_vram_total_mb(self.caps)}MB")
+                    f"剩余显存不足：模型约需 {need_mb:.0f}MB（×1.1），剩余 {free_vram_total_mb(self.caps)}MB"
+                )
 
     def _find_draft(self, cfg: dict) -> Path | None:
+        assert self._model is not None  # check_requirements 已设置模型路径
         if cfg.get("draft"):
             p = Path(cfg["draft"]).expanduser()
             return p if p.is_file() else None
         for base in (self._model.parent, *self._model.parents):
             if not base.exists():
                 continue
-            for name in ("dspark-DeepSeek-V4-Flash-0731-Q8_0.gguf",
-                         "dspark-DeepSeek-V4-Flash-0731-BF16.gguf"):
+            for name in ("dspark-DeepSeek-V4-Flash-0731-Q8_0.gguf", "dspark-DeepSeek-V4-Flash-0731-BF16.gguf"):
                 if (base / name).is_file():
                     return base / name
             found = sorted(p for p in base.glob("*dspark*.gguf") if p.is_file())
@@ -161,28 +165,57 @@ class LlamaCppAdapter(EngineAdapter):
 
     def build_command(self) -> tuple[list[str], dict[str, str]]:
         cfg = self.profile.engine_config
-        source = Path(cfg.get("source_dir") or os.environ.get("LLAMACPP_SOURCE_DIR")
-                      or PROJECT_ROOT.parent / "llama.cpp").expanduser().resolve()
+        assert self._model is not None  # check_requirements 已确保模型路径存在
+        source = (
+            Path(cfg.get("source_dir") or os.environ.get("LLAMACPP_SOURCE_DIR") or PROJECT_ROOT.parent / "llama.cpp")
+            .expanduser()
+            .resolve()
+        )
         server = str(find_server(source))
         parallel = int(cfg.get("parallel", 2))
         ctx = int(cfg["ctx_size"]) if cfg.get("ctx_size") else parallel * CTX_PER_SLOT
         gpu_split = ",".join(["1"] * int(cfg.get("gpu_count", 8)))
-        cmd = [server, "--model", str(self._model.resolve()),
-               "--host", "0.0.0.0", "--port", str(self.profile.port),
-               "--ctx-size", str(ctx), "--parallel", str(parallel),
-               "--n-gpu-layers", "999", "--split-mode", "layer",
-               "--tensor-split", gpu_split, "--jinja",
-               "--reasoning", str(cfg.get("reasoning", "on")),
-               "--reasoning-format", str(cfg.get("reasoning_format", "deepseek")),
-               "--flash-attn", "on", "--metrics"]
+        cmd = [
+            server,
+            "--model",
+            str(self._model.resolve()),
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(self.profile.port),
+            "--ctx-size",
+            str(ctx),
+            "--parallel",
+            str(parallel),
+            "--n-gpu-layers",
+            "999",
+            "--split-mode",
+            "layer",
+            "--tensor-split",
+            gpu_split,
+            "--jinja",
+            "--reasoning",
+            str(cfg.get("reasoning", "on")),
+            "--reasoning-format",
+            str(cfg.get("reasoning_format", "deepseek")),
+            "--flash-attn",
+            "on",
+            "--metrics",
+        ]
         cmd += self.api_key_args()
         if cfg.get("repeat_penalty"):
             cmd += ["--repeat-penalty", str(cfg["repeat_penalty"])]
         if self._dspark and self._draft is not None:
-            cmd += ["--model-draft", str(self._draft),
-                    "--spec-type", str(cfg.get("spec_type", "draft-dspark")),
-                    "--spec-draft-n-max", str(cfg.get("spec_draft_n_max", 3)),
-                    "--n-gpu-layers-draft", str(cfg.get("n_gpu_layers_draft", 999))]
+            cmd += [
+                "--model-draft",
+                str(self._draft),
+                "--spec-type",
+                str(cfg.get("spec_type", "draft-dspark")),
+                "--spec-draft-n-max",
+                str(cfg.get("spec_draft_n_max", 3)),
+                "--n-gpu-layers-draft",
+                str(cfg.get("n_gpu_layers_draft", 999)),
+            ]
         cmd += ["--fit", str(cfg.get("fit", "off"))]
         if cfg.get("cache_type_k", "q8_0"):
             cmd += ["--cache-type-k", str(cfg.get("cache_type_k", "q8_0"))]
@@ -193,33 +226,59 @@ class LlamaCppAdapter(EngineAdapter):
 
     def pre_start(self) -> None:
         cfg = self.profile.engine_config
-        source = Path(cfg.get("source_dir") or os.environ.get("LLAMACPP_SOURCE_DIR")
-                      or PROJECT_ROOT.parent / "llama.cpp").expanduser().resolve()
+        assert self._model is not None  # check_requirements 已确保模型路径存在
+        source = (
+            Path(cfg.get("source_dir") or os.environ.get("LLAMACPP_SOURCE_DIR") or PROJECT_ROOT.parent / "llama.cpp")
+            .expanduser()
+            .resolve()
+        )
         if cfg.get("download") and not self._model.is_file():
             dl = cfg["download"]
             model_root = Path(os.environ.get("MODEL_ROOT") or PROJECT_ROOT.parent / "model-gguf")
-            self._model, auto_draft = download_gguf(dl["modelscope_id"], model_root,
-                                                    dl.get("quant", "UD-Q8_K_XL"), self._dspark)
+            self._model, auto_draft = download_gguf(
+                dl["modelscope_id"], model_root, dl.get("quant", "UD-Q8_K_XL"), self._dspark
+            )
             if self._draft is None:
                 self._draft = auto_draft
-        require("git"); require("cmake")
+        require("git")
+        require("cmake")
         if not source.exists():
             source.parent.mkdir(parents=True, exist_ok=True)
             run(["git", "clone", "--depth", "1", OFFICIAL_URL, str(source)])
         if not (source / "build" / "bin" / "llama-server").is_file():
-            run(["cmake", "-S", str(source), "-B", str(source / "build"),
-                 "-DGGML_CUDA=ON", "-DCMAKE_BUILD_TYPE=Release"])
+            run(
+                [
+                    "cmake",
+                    "-S",
+                    str(source),
+                    "-B",
+                    str(source / "build"),
+                    "-DGGML_CUDA=ON",
+                    "-DCMAKE_BUILD_TYPE=Release",
+                ]
+            )
             run(["cmake", "--build", str(source / "build"), "--config", "Release", "-j"])
 
     def metrics_mapping(self) -> dict[str, list[str]]:
         return {
-            "prompt_total": ["llamacpp:prompt_tokens_total", "llamacpp:tokens_evaluated_total",
-                             "llama_tokens_evaluated_total", "prompt_tokens_total"],
-            "predicted_total": ["llamacpp:tokens_predicted_total", "llamacpp:predicted_tokens_total",
-                                "llama_tokens_predicted_total", "tokens_predicted_total"],
+            "prompt_total": [
+                "llamacpp:prompt_tokens_total",
+                "llamacpp:tokens_evaluated_total",
+                "llama_tokens_evaluated_total",
+                "prompt_tokens_total",
+            ],
+            "predicted_total": [
+                "llamacpp:tokens_predicted_total",
+                "llamacpp:predicted_tokens_total",
+                "llama_tokens_predicted_total",
+                "tokens_predicted_total",
+            ],
             "prompt_rate": ["llamacpp:prompt_tokens_seconds", "prompt_tokens_seconds"],
-            "predicted_rate": ["llamacpp:predicted_tokens_seconds",
-                               "llamacpp:tokens_predicted_seconds", "predicted_tokens_seconds"],
+            "predicted_rate": [
+                "llamacpp:predicted_tokens_seconds",
+                "llamacpp:tokens_predicted_seconds",
+                "predicted_tokens_seconds",
+            ],
         }
 
     def stop_patterns(self) -> list[str]:

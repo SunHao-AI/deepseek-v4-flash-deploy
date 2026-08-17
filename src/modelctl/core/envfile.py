@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """core/envfile.py — .env 解析与注入（优先级：已存在环境变量 > .env）。"""
+
 from __future__ import annotations
 
 import os

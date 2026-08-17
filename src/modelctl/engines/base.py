@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """engines/base.py — 引擎适配器抽象基类。"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -36,9 +36,15 @@ class EngineAdapter(ABC):
 
     def pre_start(self) -> None:
         """启动前钩子（下载/编译/pull）。"""
+        return None
 
     def post_start(self) -> None:
         """启动后钩子（如 ollama 预加载模型）。"""
+        return None
+
+    def unload_model(self) -> None:
+        """stop 时卸载模型；默认无操作（仅 ollama 需要）。"""
+        return None
 
     def stop_patterns(self) -> list[str]:
         return []

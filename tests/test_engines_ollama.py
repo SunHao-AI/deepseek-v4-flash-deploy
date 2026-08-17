@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import pytest
 
 from modelctl.core.capabilities import Capabilities
@@ -8,7 +7,11 @@ from modelctl.engines.base import RequirementError
 
 
 def _profile(tmp_path):
-    (tmp_path / "qwen3-ollama.yaml").write_text("name: qwen3-ollama\nengine: ollama\nport: 11434\n" "ollama:\n  model: qwen3:32b\n  num_parallel: 2\n  context_length: 32768\n", encoding="utf-8")
+    (tmp_path / "qwen3-ollama.yaml").write_text(
+        "name: qwen3-ollama\nengine: ollama\nport: 11434\n"
+        "ollama:\n  model: qwen3:32b\n  num_parallel: 2\n  context_length: 32768\n",
+        encoding="utf-8",
+    )
     return load_profile("qwen3-ollama", tmp_path)
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """engines/sglang.py — SGLang 适配器。"""
+
 from __future__ import annotations
 
 import os
@@ -23,7 +23,19 @@ class SglangAdapter(EngineAdapter):
 
     def build_command(self) -> tuple[list[str], dict[str, str]]:
         cfg = self.profile.engine_config
-        cmd = [sys.executable, "-m", "sglang.launch_server", "--model-path", str(cfg["model"]), "--host", "0.0.0.0", "--port", str(self.profile.port), "--tp", str(cfg.get("tensor_parallel_size", 1))]
+        cmd = [
+            sys.executable,
+            "-m",
+            "sglang.launch_server",
+            "--model-path",
+            str(cfg["model"]),
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(self.profile.port),
+            "--tp",
+            str(cfg.get("tensor_parallel_size", 1)),
+        ]
         if cfg.get("context_length"):
             cmd += ["--context-length", str(cfg["context_length"])]
         if cfg.get("mem_fraction_static"):

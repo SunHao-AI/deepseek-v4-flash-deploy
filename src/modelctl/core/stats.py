@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """core/stats.py — 用量统计服务（多引擎指标映射）。
 
 迁移自 script/usage_stats_server.py：把单一 llama-server 数据源改为
@@ -42,7 +41,10 @@ def _build_patterns(mapping: dict[str, list[str]]) -> dict[str, list[re.Pattern]
 
     匹配形如 "name 123" 或 "name{label=\"x\"} 123" 的 Prometheus 采样行。
     """
-    return {key: [re.compile(r"^" + re.escape(name) + r"(?:\{[^}]*\})?\s+([0-9.eE+-]+)$", re.MULTILINE) for name in names] for key, names in mapping.items()}
+    return {
+        key: [re.compile(r"^" + re.escape(name) + r"(?:\{[^}]*\})?\s+([0-9.eE+-]+)$", re.MULTILINE) for name in names]
+        for key, names in mapping.items()
+    }
 
 
 def parse_metrics(text: str, mapping: dict[str, list[str]]) -> dict[str, float]:
@@ -125,14 +127,28 @@ class UsageCollector:
     mode="on-demand"：不启动后台线程，由 get_snapshot() 在每次请求时同步拉取。
     """
 
-    def __init__(self, base_url: str, poll_interval: float, api_key: str | None, mode: str = "poll", mapping: dict[str, list[str]] | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        poll_interval: float,
+        api_key: str | None,
+        mode: str = "poll",
+        mapping: dict[str, list[str]] | None = None,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.poll_interval = poll_interval
         self.api_key = api_key
         self.mode = mode
         self.mapping = mapping or {}
         self._lock = threading.Lock()
-        self._snapshot = {"ok": False, "error": None, "prompt_total": 0.0, "predicted_total": 0.0, "prompt_rate": 0.0, "predicted_rate": 0.0}
+        self._snapshot: dict[str, object] = {
+            "ok": False,
+            "error": None,
+            "prompt_total": 0.0,
+            "predicted_total": 0.0,
+            "prompt_rate": 0.0,
+            "predicted_rate": 0.0,
+        }
         self._last = {"time": None, "predicted_total": 0.0}
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._loop, daemon=True) if mode == "poll" else None
@@ -172,9 +188,11 @@ class UsageCollector:
             now = time.monotonic()
             rate = metrics["predicted_rate"]
             # 无速率 gauge 时，用轮询差值计算速率（保留现版回退逻辑）
-            if rate <= 0.0 and self._last["time"] is not None:
-                delta_t = now - self._last["time"]
-                delta_tokens = metrics["predicted_total"] - self._last["predicted_total"]
+            last_time = self._last["time"]
+            last_total = self._last["predicted_total"]
+            if rate <= 0.0 and last_time is not None and last_total is not None:
+                delta_t = now - last_time
+                delta_tokens = metrics["predicted_total"] - last_total
                 if delta_t > 0:
                     rate = max(delta_tokens / delta_t, 0.0)
             with self._lock:
@@ -189,7 +207,14 @@ class UsageCollector:
             self._last = {"time": now, "predicted_total": metrics["predicted_total"]}
         except Exception as error:  # noqa: BLE001 —— 轮询失败仅记录，不中断服务
             with self._lock:
-                self._snapshot = {"ok": False, "error": str(error), "prompt_total": 0.0, "predicted_total": 0.0, "prompt_rate": 0.0, "predicted_rate": 0.0}
+                self._snapshot = {
+                    "ok": False,
+                    "error": str(error),
+                    "prompt_total": 0.0,
+                    "predicted_total": 0.0,
+                    "prompt_rate": 0.0,
+                    "predicted_rate": 0.0,
+                }
 
     def snapshot(self) -> dict:
         with self._lock:
@@ -266,7 +291,9 @@ def run_server(targets: list[StatsTarget]) -> None:
     collectors: dict[str, UsageCollector] = {}
     for target in targets:
         if target.mapping is not None:
-            collector = UsageCollector(target.metrics_url, poll_interval, target.api_key, mode=mode, mapping=target.mapping)
+            collector = UsageCollector(
+                target.metrics_url, poll_interval, target.api_key, mode=mode, mapping=target.mapping
+            )
             collector.start()
             collectors[target.name] = collector
 
@@ -276,7 +303,9 @@ def run_server(targets: list[StatsTarget]) -> None:
 
     server = ThreadingHTTPServer((host, port), UsageHandler)
     mode_desc = "由 cc-switch 轮询触发、每次请求同步拉取" if mode == "on-demand" else f"后台每 {poll_interval:g}s 轮询"
-    print(f"cc-switch 用量统计服务运行于 http://{host}:{port}/api/usage（{mode_desc}，{len(targets)} 个模型）", flush=True)
+    print(
+        f"cc-switch 用量统计服务运行于 http://{host}:{port}/api/usage（{mode_desc}，{len(targets)} 个模型）", flush=True
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -289,6 +318,7 @@ def run_server(targets: list[StatsTarget]) -> None:
 
 def _targets_from_profiles() -> list[StatsTarget]:
     """从 models/*.yaml 构造统计目标（供独立运行 / Task 9 后台化）。"""
+    from modelctl.core.capabilities import Capabilities
     from modelctl.core.envfile import load_env
     from modelctl.core.profile import list_profiles
     from modelctl.engines import get_adapter
@@ -296,7 +326,8 @@ def _targets_from_profiles() -> list[StatsTarget]:
     load_env()
     targets: list[StatsTarget] = []
     for profile in list_profiles():
-        adapter = get_adapter(profile.engine)(profile, None)
+        # 统计服务仅调用 metrics_mapping()，无需真实硬件探测
+        adapter = get_adapter(profile.engine)(profile, Capabilities())
         targets.append(
             StatsTarget(
                 name=profile.name,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """core/profile.py — 模型 profile（models/<name>.yaml）加载、${VAR} 插值与校验。"""
+
 from __future__ import annotations
 
 import os

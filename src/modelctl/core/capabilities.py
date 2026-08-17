@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """core/capabilities.py — 启动前硬件/环境能力探测（GPU、CC、引擎二进制）。"""
+
 from __future__ import annotations
 
 import shutil

@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 """tests/test_profile.py — Profile 加载、插值与校验测试。"""
+
 import pytest
 
 from modelctl.core.profile import Profile, ProfileError, list_profiles, load_profile

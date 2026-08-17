@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 """modelctl.core.stats 单元测试（多引擎指标映射 + 用量折算）。"""
+
 import time
 
 from modelctl.core.stats import build_usage_payload, parse_metrics
@@ -43,10 +43,10 @@ def test_parse_metrics_vllm_no_rate():
 
 
 def test_build_payload_with_budget():
-    tokens = {"prompt_total": 1_000_000, "predicted_total": 500_000,
-              "prompt_rate": 0.0, "predicted_rate": 0.0}
-    payload = build_usage_payload(tokens, {"price_in": 1.0, "price_out": 2.0, "budget": 100},
-                                  start_time=time.time() - 60, now=time.time())
+    tokens = {"prompt_total": 1_000_000, "predicted_total": 500_000, "prompt_rate": 0.0, "predicted_rate": 0.0}
+    payload = build_usage_payload(
+        tokens, {"price_in": 1.0, "price_out": 2.0, "budget": 100}, start_time=time.time() - 60, now=time.time()
+    )
     # 1M 输入 × 1元/M + 0.5M 输出 × 2元/M = 2 元
     assert payload["used"] == 2.0
     assert payload["total"] == 100
@@ -56,10 +56,8 @@ def test_build_payload_with_budget():
 
 
 def test_build_payload_no_budget():
-    tokens = {"prompt_total": 0, "predicted_rate": 0.0, "prompt_rate": 0.0,
-              "predicted_total": 0}
-    payload = build_usage_payload(tokens, {"price_in": 1.0, "price_out": 2.0},
-                                  start_time=time.time(), now=time.time())
+    tokens = {"prompt_total": 0, "predicted_rate": 0.0, "prompt_rate": 0.0, "predicted_total": 0}
+    payload = build_usage_payload(tokens, {"price_in": 1.0, "price_out": 2.0}, start_time=time.time(), now=time.time())
     # 现版语义：无预算时 total/remaining 为 None（字段仍存在）
     assert payload["total"] is None
     assert payload["remaining"] is None

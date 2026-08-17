@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """core/process.py — 引擎无关的进程生命周期：后台启动、PID、停止、健康检查。"""
+
 from __future__ import annotations
 
 import os
@@ -64,7 +64,7 @@ def stop_instance(name: str, port: int, patterns: list[str]) -> bool:
     if pf.is_file():
         try:
             pid = int(pf.read_text(encoding="utf-8").strip())
-            os.killpg(pid, signal.SIGTERM)
+            os.killpg(pid, signal.SIGTERM)  # type: ignore[attr-defined]  # POSIX-only，Windows 类型桩无此 API
             deadline = time.time() + 10
             while time.time() < deadline:
                 try:
@@ -73,7 +73,7 @@ def stop_instance(name: str, port: int, patterns: list[str]) -> bool:
                 except OSError:
                     break
             else:
-                os.killpg(pid, signal.SIGKILL)
+                os.killpg(pid, signal.SIGKILL)  # type: ignore[attr-defined]  # POSIX-only，Windows 类型桩无此 API
             stopped = True
         except (ValueError, OSError):
             pass
