@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# modelctl.sh — modelctl.py 的 bash 入口（后台 start/stop/restart 语义）
+# modelctl.sh — 调用已安装的 modelctl 命令
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 "$SCRIPT_DIR/modelctl.py" "$@"
+exec modelctl "$@"

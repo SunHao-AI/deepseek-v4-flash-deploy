@@ -18,11 +18,14 @@ deepseek-v4-flash/
 ├── README.md                       # 本文档（入口）
 ├── docs/
 │   └── DeepSeek-V4-Flash后台启动指南.md   # 部署与运维详细指南
-├── script/
-│   ├── modelctl.py                 # 统一 CLI 入口（start/stop/restart/status/list/probe/stats）
-│   ├── modelctl.sh                 # bash 薄封装（推荐入口）
+├── src/modelctl/
+│   ├── cli.py                      # 统一 CLI 入口（start/stop/restart/status/list/probe/stats）
+│   ├── __main__.py                 # python -m modelctl 入口
 │   ├── core/                       # 核心模块：envfile / profile / capabilities / process / stats
-│   └── engines/                    # 引擎适配器：base / llamacpp / ollama / vllm / sglang
+│   ├── engines/                    # 引擎适配器：base / llamacpp / ollama / vllm / sglang
+│   └── py.typed                    # PEP 561 类型标记
+├── script/
+│   └── modelctl.sh                 # bash 薄封装（调用已安装的 modelctl 命令）
 ├── models/                         # 模型 profile（每模型一个 YAML）
 │   ├── deepseek-v4.yaml            # DeepSeek-V4-Flash（llamacpp + DSpark）
 │   ├── qwen3-ollama.yaml           # Qwen3-32B（ollama）
@@ -31,6 +34,13 @@ deepseek-v4-flash/
 ├── .env                            # 本地配置（含密钥，不入库）
 ├── .gitignore
 └── pyproject.toml
+```
+
+## 安装
+
+```bash
+uv sync --extra dev
+uv run modelctl list
 ```
 
 ## 快速开始
@@ -65,10 +75,10 @@ bash script/modelctl.sh start qwen3-ollama
 bash script/modelctl.sh start qwen3-vllm
 ```
 
-也可直接调用 Python 入口：
+也可直接调用已安装的 `modelctl` 命令：
 
 ```bash
-python3 script/modelctl.py start deepseek-v4
+uv run modelctl start deepseek-v4
 ```
 
 ### 4. 验证
