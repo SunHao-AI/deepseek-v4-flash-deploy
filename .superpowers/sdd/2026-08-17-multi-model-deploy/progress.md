@@ -1,4 +1,4 @@
-﻿# SDD ledger — plan: docs/superpowers/plans/2026-08-17-multi-model-deploy.md
+# SDD ledger — plan: docs/superpowers/plans/2026-08-17-multi-model-deploy.md
 
 
 Task 1: complete (commits 0eefc6a..f76501a, review clean)
@@ -17,4 +17,6 @@ Task 6: complete (commits 21b792f..4a76299, review clean)
 Task 7: complete (commits 4a76299..9d52985, review clean)
 
 Task 8: complete (commits 9d52985..99a2c37, review clean)
+
+Task 9: complete (commit 7f44dd6)
 
