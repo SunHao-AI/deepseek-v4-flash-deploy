@@ -13,7 +13,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-from core.envfile import PROJECT_ROOT
+from modelctl.core.envfile import PROJECT_ROOT
 
 
 def log_dir() -> Path:

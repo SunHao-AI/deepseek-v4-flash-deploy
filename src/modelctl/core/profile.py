@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-from core.envfile import PROJECT_ROOT
+from modelctl.core.envfile import PROJECT_ROOT
 
 KNOWN_ENGINES = {"llamacpp", "ollama", "vllm", "sglang"}
 _VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")

@@ -10,9 +10,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from core.capabilities import free_vram_total_mb
-from core.envfile import PROJECT_ROOT
-from engines.base import EngineAdapter, RequirementError
+from modelctl.core.capabilities import free_vram_total_mb
+from modelctl.core.envfile import PROJECT_ROOT
+from modelctl.engines.base import EngineAdapter, RequirementError
 
 OFFICIAL_URL = "https://github.com/ggml-org/llama.cpp.git"
 DSPARK_PATTERNS = ["*dspark*"]

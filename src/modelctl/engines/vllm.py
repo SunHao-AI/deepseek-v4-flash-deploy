@@ -6,8 +6,8 @@ from __future__ import annotations
 import os
 import shlex
 
-from core.capabilities import cc_at_least
-from engines.base import EngineAdapter, RequirementError
+from modelctl.core.capabilities import cc_at_least
+from modelctl.engines.base import EngineAdapter, RequirementError
 
 
 class VllmAdapter(EngineAdapter):

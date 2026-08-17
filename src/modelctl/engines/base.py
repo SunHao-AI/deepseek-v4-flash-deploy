@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from core.capabilities import Capabilities
-from core.profile import Profile
+from modelctl.core.capabilities import Capabilities
+from modelctl.core.profile import Profile
 
 
 class RequirementError(RuntimeError):

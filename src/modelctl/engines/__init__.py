@@ -3,12 +3,12 @@
 """engines/__init__.py — 引擎注册表。"""
 from __future__ import annotations
 
-from core.profile import ProfileError
-from engines.base import EngineAdapter
-from engines.llamacpp import LlamaCppAdapter
-from engines.ollama import OllamaAdapter
-from engines.sglang import SglangAdapter
-from engines.vllm import VllmAdapter
+from modelctl.core.profile import ProfileError
+from modelctl.engines.base import EngineAdapter
+from modelctl.engines.llamacpp import LlamaCppAdapter
+from modelctl.engines.ollama import OllamaAdapter
+from modelctl.engines.sglang import SglangAdapter
+from modelctl.engines.vllm import VllmAdapter
 
 _REGISTRY: dict[str, type[EngineAdapter]] = {
     "llamacpp": LlamaCppAdapter,

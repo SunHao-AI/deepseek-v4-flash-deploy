@@ -8,7 +8,7 @@ import os
 import subprocess
 import urllib.request
 
-from engines.base import EngineAdapter, RequirementError
+from modelctl.engines.base import EngineAdapter, RequirementError
 
 
 class OllamaAdapter(EngineAdapter):

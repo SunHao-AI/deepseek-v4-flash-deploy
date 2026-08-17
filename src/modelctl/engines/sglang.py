@@ -7,7 +7,7 @@ import os
 import shlex
 import sys
 
-from engines.base import EngineAdapter, RequirementError
+from modelctl.engines.base import EngineAdapter, RequirementError
 
 
 class SglangAdapter(EngineAdapter):

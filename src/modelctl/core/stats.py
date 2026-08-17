@@ -15,7 +15,7 @@ metrics_mapping() 提供（mapping 为 None 表示该引擎不支持精确统计
 - on-demand：不启动后台线程，由 cc-switch 轮询触发，每次请求同步拉取。
 
 纯标准库实现，零第三方依赖。独立运行：
-    python -m core.stats
+    python -m modelctl.core.stats
 """
 
 from __future__ import annotations
@@ -287,9 +287,9 @@ def run_server(targets: list[StatsTarget]) -> None:
 
 def _targets_from_profiles() -> list[StatsTarget]:
     """从 models/*.yaml 构造统计目标（供独立运行 / Task 9 后台化）。"""
-    from core.envfile import load_env
-    from core.profile import list_profiles
-    from engines import get_adapter
+    from modelctl.core.envfile import load_env
+    from modelctl.core.profile import list_profiles
+    from modelctl.engines import get_adapter
 
     load_env()
     targets: list[StatsTarget] = []
