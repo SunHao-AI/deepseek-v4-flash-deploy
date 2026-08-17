@@ -1,13 +1,14 @@
 [project]
-name = "deepseek-v4-flash"
-version = "0.1.0"
-description = "DeepSeek-V4-Flash-0731 GGUF 服务启动工具（官方 llama.cpp + DSpark）"
-requires-python = ">=3.10"
-# 运行时零强制依赖：.env 解析优先用内置解析器；
-# 若已安装 python-dotenv 则会自动走标准实现（见 script/start_v4_flash_gguf.py 的 load_env）。
-dependencies = []
+name = "modelctl"
+version = "0.2.0"
+description = "多模型部署启动器（llamacpp / ollama / vllm / sglang）"
+requires-python = ">=3.12"
+dependencies = ["PyYAML>=6.0"]
 
 [project.optional-dependencies]
-dotenv = ["python-dotenv>=1.0"]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.uv]
