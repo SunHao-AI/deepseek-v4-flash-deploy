@@ -206,7 +206,7 @@ def _cmd_stats_start() -> int:
     # modelctl.core.stats 的 _targets_from_profiles() 从 models/*.yaml 加载全部
     # profile 构造——未运行的模型会返回不可用状态（isValid=False），而非在此过滤。
     # 这是计划"独立进程入口"的合理实现，故此处不预构造 targets。
-    script_dir = str(Path(__file__).resolve().parent)
+    script_dir = str(Path(__file__).resolve().parents[1])
     extra_env = {"PYTHONPATH": script_dir + os.pathsep + os.environ.get("PYTHONPATH", "")}
     pid = start_detached("usage-stats", [sys.executable, "-m", "modelctl.core.stats"], extra_env)
     port = int(os.environ.get("USAGE_PORT", str(USAGE_PORT)))
