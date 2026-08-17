@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "script"))
-
-from core.envfile import parse_env_file, load_env  # noqa: E402
+from modelctl.core.envfile import parse_env_file, load_env
 
 
 def test_parse_env_file_basic(tmp_path):

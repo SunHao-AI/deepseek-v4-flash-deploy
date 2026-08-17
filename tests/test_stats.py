@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
-"""core.stats 单元测试（多引擎指标映射 + 用量折算）。"""
-import sys
+"""modelctl.core.stats 单元测试（多引擎指标映射 + 用量折算）。"""
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "script"))
-
-from core.stats import build_usage_payload, parse_metrics  # noqa: E402
+from modelctl.core.stats import build_usage_payload, parse_metrics
 
 LLAMACPP_MAPPING = {
     "prompt_total": ["llamacpp:prompt_tokens_total"],

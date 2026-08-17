@@ -1,11 +1,6 @@
 # -*- coding: utf-8 -*-
-"""core/capabilities.py 单元测试。"""
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "script"))
-
-from core.capabilities import cc_at_least, free_vram_total_mb, probe  # noqa: E402
+"""modelctl/core/capabilities.py 单元测试。"""
+from modelctl.core.capabilities import cc_at_least, free_vram_total_mb, probe
 
 SMI_5880 = "\n".join(["RTX 5880 Ada Generation, 49140, 48000, 580.65.05, 8.9"] * 8)
 

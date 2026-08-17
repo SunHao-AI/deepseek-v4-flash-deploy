@@ -1,13 +1,8 @@
 # -*- coding: utf-8 -*-
 """tests/test_profile.py — Profile 加载、插值与校验测试。"""
-import sys
-from pathlib import Path
-
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "script"))
-
-from core.profile import Profile, ProfileError, list_profiles, load_profile  # noqa: E402
+from modelctl.core.profile import Profile, ProfileError, list_profiles, load_profile
 
 YAML = """
 name: demo

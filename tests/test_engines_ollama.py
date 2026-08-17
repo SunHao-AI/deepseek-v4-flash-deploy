@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
-import sys
-from pathlib import Path
-
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "script"))
-
-from core.capabilities import Capabilities  # noqa: E402
-from core.profile import load_profile  # noqa: E402
-from engines import get_adapter  # noqa: E402
-from engines.base import RequirementError  # noqa: E402
+from modelctl.core.capabilities import Capabilities
+from modelctl.core.profile import load_profile
+from modelctl.engines import get_adapter
+from modelctl.engines.base import RequirementError
 
 
 def _profile(tmp_path):

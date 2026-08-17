@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import sys
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "script"))
+import pytest
 
-from core import process  # noqa: E402
+from modelctl.core import process
 
 
 def test_pid_file_path(monkeypatch, tmp_path):
@@ -13,6 +12,7 @@ def test_pid_file_path(monkeypatch, tmp_path):
     assert process.pid_file("demo") == tmp_path / "demo.pid"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="process.py 目标平台为 Linux（os.killpg/fuser/pkill 不可用于 Windows）")
 def test_start_and_is_running(monkeypatch, tmp_path):
     monkeypatch.setenv("LOG_DIR", str(tmp_path))
     pid = process.start_detached("sleeper", [sys.executable, "-c", "import time; time.sleep(60)"], {})
