@@ -6,10 +6,12 @@ from __future__ import annotations
 from core.profile import ProfileError
 from engines.base import EngineAdapter
 from engines.llamacpp import LlamaCppAdapter
+from engines.ollama import OllamaAdapter
 
 _REGISTRY: dict[str, type[EngineAdapter]] = {
     "llamacpp": LlamaCppAdapter,
-    # ollama / vllm / sglang 在后续任务注册
+    "ollama": OllamaAdapter,
+    # vllm / sglang 在后续任务注册
 }
 
 
