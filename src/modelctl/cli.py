@@ -21,12 +21,12 @@ import os
 import sys
 from pathlib import Path
 
-from core.capabilities import probe
-from core.envfile import load_env
-from core.process import is_running, launch_log, pid_file, start_detached, stop_instance, tail_file, wait_health
-from core.profile import ProfileError, list_profiles, load_profile
-from engines import get_adapter
-from engines.base import RequirementError
+from modelctl.core.capabilities import probe
+from modelctl.core.envfile import load_env
+from modelctl.core.process import is_running, launch_log, pid_file, start_detached, stop_instance, tail_file, wait_health
+from modelctl.core.profile import ProfileError, list_profiles, load_profile
+from modelctl.engines import get_adapter
+from modelctl.engines.base import RequirementError
 
 # 默认统计服务端口（与 core/stats.py 的 USAGE_PORT 默认值一致）
 DEFAULT_USAGE_PORT = 5002
