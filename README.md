@@ -33,10 +33,8 @@ deepseek-v4-flash/
 │   ├── qwen3-vllm.yaml             # Qwen3-32B（vllm）
 │   ├── llamacpp/                   # llamacpp 引擎 profile 子目录
 │   │   └── qwen3-llamacpp.yaml     # Qwen3.8-27B GGUF（llamacpp）
-│   ├── ollama/                     # ollama 引擎 profile 子目录
-│   │   └── qwen3-ollama.yaml       # Qwen3-32B（ollama，示例）
-│   └── vllm/                       # vllm 引擎 profile 子目录
-│       └── qwen3-vllm.yaml         # Qwen3-32B（vllm，示例）
+│   ├── ollama/                     # ollama 引擎 profile 子目录（预留）
+│   └── vllm/                       # vllm 引擎 profile 子目录（预留）
 ├── .env.example                    # 全局配置模板（复制为 .env 后修改）
 ├── .env                            # 本地配置（含密钥，不入库）
 ├── .gitignore

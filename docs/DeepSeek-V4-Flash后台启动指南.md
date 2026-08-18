@@ -56,10 +56,8 @@ models/
 ├── qwen3-llama.yaml            # llamacpp（根目录）
 ├── llamacpp/                   # llamacpp 引擎 profile 子目录
 │   └── qwen3-llamacpp.yaml
-├── ollama/
-│   └── qwen3-ollama.yaml       # 与根目录同名时根目录优先（向后兼容）
-└── vllm/
-    └── qwen3-vllm.yaml
+├── ollama/                     # ollama 引擎 profile 子目录（预留）
+└── vllm/                       # vllm 引擎 profile 子目录（预留）
 ```
 
 同一 `name` 同时存在于根目录与子目录时，以根目录为准（`modelctl list` 会打印忽略警告）。
