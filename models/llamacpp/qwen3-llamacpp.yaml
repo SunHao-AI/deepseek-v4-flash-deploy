@@ -1,4 +1,4 @@
-name: qwen3
+name: qwen3-llamacpp
 engine: llamacpp
 port: 8000
 api_key: ${API_KEY}
