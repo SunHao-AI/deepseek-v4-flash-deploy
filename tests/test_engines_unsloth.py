@@ -46,7 +46,11 @@ def test_unsloth_requirements_allow_download_only(tmp_path):
 
 
 def test_unsloth_tensor_parallel_requires_2_gpus(tmp_path):
-    p = _write(tmp_path, "name: u\nengine: unsloth\nport: 30000\napi_key: k\nunsloth:\n  model: m\n  tensor_parallel: true\n")
+    p = _write(
+        tmp_path,
+        "name: u\nengine: unsloth\nport: 30000\napi_key: k\n"
+        "unsloth:\n  model: m\n  tensor_parallel: true\n",
+    )
     a = get_adapter("unsloth")(p, Capabilities(gpu_count=1, binaries={"unsloth": True}))
     with pytest.raises(RequirementError, match="2 块 GPU"):
         a.check_requirements()
@@ -71,7 +75,8 @@ def test_unsloth_build_command(tmp_path, monkeypatch):
 def test_unsloth_build_command_local_path_ignores_variant(tmp_path):
     p = _write(
         tmp_path,
-        f"name: u\nengine: unsloth\nport: 30000\nunsloth:\n  model: {tmp_path}/model.gguf\n  gguf_variant: UD-Q4_K_XL\n",
+        f"name: u\nengine: unsloth\nport: 30000\nunsloth:\n  model: {tmp_path}/model.gguf\n"
+        f"  gguf_variant: UD-Q4_K_XL\n",
     )
     (tmp_path / "model.gguf").write_text("x", encoding="utf-8")
     a = get_adapter("unsloth")(p, CAPS8)
