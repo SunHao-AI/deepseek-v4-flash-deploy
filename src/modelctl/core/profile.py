@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from loguru import logger
 
 from modelctl.core.envfile import PROJECT_ROOT
 
@@ -78,11 +79,19 @@ def _to_profile(raw: dict[str, Any], path: Path) -> Profile:
 
 
 def load_profile(name: str, models_dir: Path | None = None) -> Profile:
-    """加载指定 name 的 YAML profile（models_dir/<name>.yaml）。"""
+    """加载指定 name 的 YAML profile（根目录优先，其次 models/<engine>/*.yaml）。"""
     models_dir = models_dir or PROJECT_ROOT / "models"
-    path = models_dir / f"{name}.yaml"
-    if not path.is_file():
-        raise ProfileError(f"profile 不存在：{path}")
+    candidates = [
+        models_dir / f"{name}.yaml",
+        *sorted(models_dir.rglob(f"{name}.yaml")),
+    ]
+    for path in candidates:
+        if path.is_file():
+            return _load_profile_from_path(path)
+    raise ProfileError(f"profile 不存在：{models_dir / f'{name}.yaml'}")
+
+
+def _load_profile_from_path(path: Path) -> Profile:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as e:
@@ -93,8 +102,22 @@ def load_profile(name: str, models_dir: Path | None = None) -> Profile:
 
 
 def list_profiles(models_dir: Path | None = None) -> list[Profile]:
-    """按文件名排序加载 models_dir 下所有 *.yaml profile。"""
+    """递归扫描 models_dir 下所有 *.yaml profile，根目录优先并去重。"""
     models_dir = models_dir or PROJECT_ROOT / "models"
     if not models_dir.is_dir():
         return []
-    return [load_profile(p.stem, models_dir) for p in sorted(models_dir.glob("*.yaml"))]
+    root_files = sorted(models_dir.glob("*.yaml"))
+    sub_files = sorted(p for p in models_dir.rglob("*.yaml") if p not in root_files)
+    seen: set[str] = set()
+    result: list[Profile] = []
+    for p in root_files + sub_files:
+        try:
+            profile = _load_profile_from_path(p)
+        except ProfileError:
+            continue
+        if profile.name in seen:
+            logger.warning(f"忽略子目录中重复的 profile：{profile.name}（{p}）")
+            continue
+        seen.add(profile.name)
+        result.append(profile)
+    return result

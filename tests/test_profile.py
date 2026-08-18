@@ -68,3 +68,31 @@ def test_list_profiles_sorted(tmp_path):
 def test_missing_file(tmp_path):
     with pytest.raises(ProfileError, match="不存在"):
         load_profile("ghost", tmp_path)
+
+
+def test_load_profile_from_engine_subdir(tmp_path, monkeypatch):
+    monkeypatch.setenv("TEST_KEY", "secret")
+    (tmp_path / "llamacpp").mkdir()
+    (tmp_path / "llamacpp" / "qwen3.yaml").write_text(
+        "name: qwen3\nengine: llamacpp\nport: 8000\nllamacpp:\n  model: /x.gguf\n",
+        encoding="utf-8",
+    )
+    p = load_profile("qwen3", tmp_path)
+    assert p.name == "qwen3" and p.engine == "llamacpp"
+    assert p.path == tmp_path / "llamacpp" / "qwen3.yaml"
+
+
+def test_list_profiles_prefers_root_over_subdir(tmp_path, monkeypatch, caplog):
+    monkeypatch.setenv("TEST_KEY", "secret")
+    (tmp_path / "qwen3.yaml").write_text(
+        "name: qwen3\nengine: ollama\nport: 11434\nollama:\n  model: qwen3:root\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "llamacpp").mkdir()
+    (tmp_path / "llamacpp" / "qwen3.yaml").write_text(
+        "name: qwen3\nengine: llamacpp\nport: 8000\nllamacpp:\n  model: /x.gguf\n",
+        encoding="utf-8",
+    )
+    profiles = list_profiles(tmp_path)
+    assert [p.name for p in profiles] == ["qwen3"]
+    assert profiles[0].engine == "ollama"
