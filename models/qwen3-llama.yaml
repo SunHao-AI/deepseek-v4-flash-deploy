@@ -1,6 +1,6 @@
-# qwen3-llamacpp.yaml —— Qwen3.8-27B（GGUF，llama.cpp 引擎，子目录示例）
-# name：CLI 标识符，`modelctl start qwen3-llamacpp` 使用；全局唯一
-name: qwen3-llamacpp
+# qwen3-llama.yaml —— Qwen3.8-27B（GGUF，llama.cpp 引擎）
+# name：CLI 标识符，`modelctl start qwen3-llama` 使用；全局唯一
+name: qwen3-llama
 # engine：引擎类型，决定启动命令与参数映射（llamacpp / ollama / vllm / sglang）
 engine: llamacpp
 # port：服务监听端口（健康检查 http://127.0.0.1:<port>/health）
@@ -14,9 +14,11 @@ llamacpp:
   model: ""
   # download：模型不存在时的自动下载配置（ModelScope）
   download:
-    # modelscope_id：ModelScope 仓库 ID（GGUF 格式）
+    # modelscope_id：ModelScope 仓库 ID（GGUF 格式，Qwen3.8-27B 量化版）
     modelscope_id: unsloth/Qwen3.8-27B-GGUF
-    # quant：仓库内实际量化名（需与 GGUF 文件名量化段一致），如 Q4_K_M / Q5_K_M / Q8_0
+    # quant：仓库内实际量化名（需与 GGUF 文件名量化段一致）。
+    # 可选：Q3_K_M / Q4_K_M / Q5_K_M / Q6_K / Q8_0 / UD-Q4_K_XL / UD-Q5_K_XL / UD-Q8_K_XL 等
+    # 显存建议：2×24GB 显卡选 Q4_K_M（约 17GB）；显存充足可选 Q5_K_M / Q8_0
     quant: Q4_K_M
   # parallel：并发槽位数（同时处理多少请求），显存占用随其增长
   parallel: 2
