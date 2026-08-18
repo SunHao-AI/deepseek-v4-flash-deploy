@@ -90,3 +90,64 @@ def test_unsloth_health_url_and_metrics(tmp_path):
     assert a.health_url() == "http://127.0.0.1:30000/v1/models"
     assert a.metrics_mapping() is None
     assert a.stop_patterns() == ["unsloth"]
+
+
+def test_unsloth_pre_start_downloads_and_persists(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODEL_ROOT", str(tmp_path / "model-gguf"))
+    p = _write(
+        tmp_path,
+        "name: u\nengine: unsloth\nport: 30000\n"
+        "unsloth:\n  model: ''\n  download:\n"
+        "    modelscope_id: unsloth/DeepSeek-V4-Flash-0731-GGUF\n    quant: UD-Q8_K_XL\n",
+    )
+    a = get_adapter("unsloth")(p, CAPS8)
+
+    downloaded = tmp_path / "model-gguf" / "DeepSeek-V4-Flash-0731-GGUF" / "UD-Q8_K_XL" / "model.gguf"
+    monkeypatch.setattr(
+        "modelctl.engines.unsloth.download_gguf",
+        lambda mid, root, quant, want_dspark: (downloaded, None),
+    )
+
+    a.pre_start()
+    assert p.engine_config["model"] == str(downloaded.resolve())
+    content = p.path.read_text(encoding="utf-8")
+    assert f"model: {downloaded.resolve()}" in content
+    assert (tmp_path / "u.yaml.bak").is_file()
+
+
+def test_unsloth_pre_start_skips_when_model_exists(tmp_path, monkeypatch):
+    p = _write(
+        tmp_path,
+        f"name: u\nengine: unsloth\nport: 30000\nunsloth:\n  model: {tmp_path}/model.gguf\n",
+    )
+    (tmp_path / "model.gguf").write_text("x", encoding="utf-8")
+    a = get_adapter("unsloth")(p, CAPS8)
+    calls = []
+
+    def _fail(*args, **kwargs):  # 不应被调用
+        calls.append("called")
+        return tmp_path
+
+    monkeypatch.setattr("modelctl.engines.unsloth.download_gguf", _fail)
+    monkeypatch.setattr("modelctl.engines.unsloth.persist_model_path", _fail)
+
+    a.pre_start()
+    assert calls == []
+
+
+def test_unsloth_pre_start_download_failure_hints_hf(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODEL_ROOT", str(tmp_path / "model-gguf"))
+    p = _write(
+        tmp_path,
+        "name: u\nengine: unsloth\nport: 30000\n"
+        "unsloth:\n  model: ''\n  download:\n"
+        "    modelscope_id: unsloth/DeepSeek-V4-Flash-0731-GGUF\n    quant: UD-Q8_K_XL\n",
+    )
+    a = get_adapter("unsloth")(p, CAPS8)
+
+    def _fail(*args, **kwargs):
+        raise RequirementError("ModelScope 下载失败")
+
+    monkeypatch.setattr("modelctl.engines.unsloth.download_gguf", _fail)
+    with pytest.raises(RequirementError, match="HF_ENDPOINT"):
+        a.pre_start()

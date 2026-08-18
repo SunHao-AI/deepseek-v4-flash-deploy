@@ -8,7 +8,10 @@ import shlex
 from pathlib import Path
 
 from modelctl.core.capabilities import free_vram_total_mb
+from modelctl.core.envfile import PROJECT_ROOT
+from modelctl.engines._persist import persist_model_path
 from modelctl.engines.base import EngineAdapter, RequirementError
+from modelctl.engines.llamacpp import download_gguf
 
 # Unsloth 无头服务固定参数。
 # 注意：具体 flag 需在目标机器上以 `unsloth --help` / `unsloth start --no-launch`
@@ -55,6 +58,28 @@ class UnslothAdapter(EngineAdapter):
             return str(p)
         variant = cfg.get("gguf_variant")
         return f"{model}:{variant}" if variant else model
+
+    def pre_start(self) -> None:
+        cfg = self.profile.engine_config
+        model = str(cfg.get("model") or "")
+        if model and (Path(model).expanduser().is_file() or Path(model).expanduser().is_dir()):
+            return
+        if not cfg.get("download"):
+            return
+        dl = cfg["download"]
+        model_root = Path(os.environ.get("MODEL_ROOT") or PROJECT_ROOT.parent / "model-gguf")
+        try:
+            model_match, _draft = download_gguf(
+                dl["modelscope_id"], model_root, dl.get("quant", "UD-Q8_K_XL"), want_dspark=False
+            )
+        except RequirementError as error:
+            raise RequirementError(
+                f"{self.profile.name}：ModelScope 下载失败。\n{error}\n"
+                "可配置 HF_ENDPOINT=https://hf-mirror.com 后从 Hugging Face 手动下载 "
+                "unsloth GGUF 仓库，并将本地路径填入 unsloth.model。"
+            ) from error
+        persist_model_path(self.profile.path, "unsloth", str(model_match.resolve()))
+        cfg["model"] = str(model_match.resolve())
 
     def build_command(self) -> tuple[list[str], dict[str, str]]:
         cfg = self.profile.engine_config
