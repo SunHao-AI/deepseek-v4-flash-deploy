@@ -192,7 +192,7 @@ def _cmd_probe(args, models_dir: Path | None, caps) -> int:
     print(f"CUDA 驱动：{caps.cuda_driver or '未知'}")
     print(f"计算能力（CC）：{caps.compute_capability or '未知'}")
     print("引擎二进制可用性：")
-    for name in ("ollama", "vllm", "sglang"):
+    for name in ("ollama", "vllm", "sglang", "unsloth"):
         available = "可用" if caps.binaries.get(name) else "不可用"
         print(f"  {name}: {available}")
     return 0

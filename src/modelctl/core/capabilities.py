@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 
-ENGINE_BINARIES = ["ollama", "vllm", "sglang"]  # llamacpp 由源码编译，不在此列
+ENGINE_BINARIES = ["ollama", "vllm", "sglang", "unsloth"]  # llamacpp 由源码编译，不在此列
 
 
 @dataclass

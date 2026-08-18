@@ -8,6 +8,7 @@ from modelctl.engines.base import EngineAdapter
 from modelctl.engines.llamacpp import LlamaCppAdapter
 from modelctl.engines.ollama import OllamaAdapter
 from modelctl.engines.sglang import SglangAdapter
+from modelctl.engines.unsloth import UnslothAdapter
 from modelctl.engines.vllm import VllmAdapter
 
 _REGISTRY: dict[str, type[EngineAdapter]] = {
@@ -15,6 +16,7 @@ _REGISTRY: dict[str, type[EngineAdapter]] = {
     "ollama": OllamaAdapter,
     "vllm": VllmAdapter,
     "sglang": SglangAdapter,
+    "unsloth": UnslothAdapter,
 }
 
 
