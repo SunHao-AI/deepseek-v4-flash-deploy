@@ -15,7 +15,7 @@
 ## 目录结构
 
 ```
-deepseek-v4-flash/
+modelctl/
 ├── README.md                       # 本文档（入口）
 ├── docs/
 │   └── DeepSeek-V4-Flash后台启动指南.md   # 部署与运维详细指南
@@ -23,20 +23,32 @@ deepseek-v4-flash/
 │   ├── cli.py                      # 统一 CLI 入口（start/stop/restart/status/list/probe/stats）
 │   ├── __main__.py                 # python -m modelctl 入口
 │   ├── core/                       # 核心模块：envfile / profile / capabilities / process / stats
-│   ├── engines/                    # 引擎适配器：base / llamacpp / ollama / vllm / sglang
+│   ├── engines/                    # 引擎适配器：base / llamacpp / ollama / vllm / sglang / unsloth
 │   └── py.typed                    # PEP 561 类型标记
 ├── script/
 │   └── modelctl.sh                 # bash 薄封装（调用已安装的 modelctl 命令）
-├── models/                         # 模型 profile（每模型一个 YAML）
-│   ├── deepseek-v4.yaml            # DeepSeek-V4-Flash（llamacpp + DSpark）
-│   ├── qwen3-ollama.yaml           # Qwen3-32B（ollama）
-│   ├── qwen3-vllm.yaml             # Qwen3-32B（vllm）
+├── models/                         # 模型 profile（每模型一个 YAML，按引擎分目录）
+│   ├── deepseek-v4.yaml            # DeepSeek-V4-Flash（llamacpp + DSpark，根目录兼容旧式）
+│   ├── qwen3-llama.yaml            # Qwen3.8-27B（llamacpp，根目录兼容旧式）
+│   ├── qwen3-ollama.yaml           # Qwen3-32B（ollama，根目录兼容旧式）
+│   ├── qwen3-vllm.yaml             # Qwen3-32B（vllm，根目录兼容旧式）
 │   ├── llamacpp/                   # llamacpp 引擎 profile 子目录
-│   │   └── qwen3-llamacpp.yaml     # Qwen3.8-27B GGUF（llamacpp）
-│   ├── ollama/                     # ollama 引擎 profile 子目录（预留）
-│   ├── unsloth/                    # unsloth 引擎 profile 子目录
-│   │   └── deepseek-v4-unsloth.yaml
-│   └── vllm/                       # vllm 引擎 profile 子目录（预留）
+│   │   ├── deepseek-v4-flash.yaml  # DeepSeek-V4-Flash（llamacpp + DSpark）
+│   │   ├── qwen3.8.yaml            # Qwen3.8-27B GGUF（llamacpp）
+│   │   └── qwen3-llamacpp.yaml     # Qwen3.8-27B GGUF（llamacpp，旧式命名）
+│   ├── ollama/                     # ollama 引擎 profile 子目录
+│   │   ├── deepseek-v4-flash.yaml  # DeepSeek-V4-Flash（ollama）
+│   │   └── qwen3.8.yaml            # Qwen3.8-27B（ollama）
+│   ├── vllm/                       # vllm 引擎 profile 子目录
+│   │   ├── deepseek-v4-flash.yaml  # DeepSeek-V4-Flash（vllm）
+│   │   └── qwen3.8.yaml            # Qwen3.8-27B（vllm）
+│   ├── sglang/                     # sglang 引擎 profile 子目录
+│   │   ├── deepseek-v4-flash.yaml  # DeepSeek-V4-Flash（sglang）
+│   │   └── qwen3.8.yaml            # Qwen3.8-27B（sglang）
+│   └── unsloth/                    # unsloth 引擎 profile 子目录
+│       ├── deepseek-v4-flash.yaml  # DeepSeek-V4-Flash（unsloth）
+│       ├── qwen3.8.yaml            # Qwen3.8-27B（unsloth）
+│       └── deepseek-v4-unsloth.yaml # DeepSeek-V4-Flash（unsloth，旧式命名）
 ├── .env.example                    # 全局配置模板（复制为 .env 后修改）
 ├── .env                            # 本地配置（含密钥，不入库）
 ├── .gitignore
@@ -72,12 +84,13 @@ vi .env        # 修改 API 密钥、存储目录、日志目录等全局配置
 
 > 首次启动前，请务必在 `.env` 中设置模型存储目录，否则下载/缓存位置会回退到代码默认值（可能落在项目根目录或当前盘符）：
 >
-> | profile | 控制下载/缓存位置的环境变量 |
+> | 引擎 | 控制下载/缓存位置的环境变量 |
 > |---------|----------------------------|
-> | `deepseek-v4` / `qwen3-llama` / `qwen3-llamacpp` | `MODEL_ROOT`（GGUF 保存父目录）、`MODELSCOPE_CACHE` |
-> | `qwen3-ollama` | `OLLAMA_MODELS` |
-> | `qwen3-vllm` | `MODEL_ROOT`（ModelScope 下载目录）、`HF_HOME`（vLLM 缓存） |
-> | `deepseek-v4-unsloth` | `UNSLOTH_API_KEY`（必填）、`HF_ENDPOINT`（HF 兜底镜像）、`MODEL_ROOT`（ModelScope 下载） |
+> | llamacpp（`deepseek-v4` / `qwen3-llama` / `qwen3-llamacpp` / `deepseek-v4-flash-llamacpp` / `qwen3.8-llamacpp`） | `MODEL_ROOT`（GGUF 保存父目录）、`MODELSCOPE_CACHE` |
+> | ollama（`qwen3-ollama` / `deepseek-v4-flash-ollama` / `qwen3.8-ollama`） | `OLLAMA_MODELS` |
+> | vllm（`qwen3-vllm` / `deepseek-v4-flash-vllm` / `qwen3.8-vllm`） | `MODEL_ROOT`（ModelScope 下载目录）、`HF_HOME`（vLLM 缓存） |
+> | sglang（`deepseek-v4-flash-sglang` / `qwen3.8-sglang`） | `MODEL_ROOT`（ModelScope 下载目录）、`HF_HOME`（SGLang 缓存） |
+> | unsloth（`deepseek-v4-unsloth` / `deepseek-v4-flash-unsloth` / `qwen3.8-unsloth`） | `UNSLOTH_API_KEY`（必填）、`HF_ENDPOINT`（HF 兜底镜像）、`MODEL_ROOT`（ModelScope 下载） |
 
 ### 2.5 模型自动下载
 
@@ -115,6 +128,30 @@ bash script/modelctl.sh start qwen3-llamacpp
 # 启动 DeepSeek-V4-Flash（unsloth 无头 API，Unsloth 动态量化 GGUF）
 # 模型从 ModelScope 下载并写回 profile；api_key 取 .env 中 UNSLOTH_API_KEY
 bash script/modelctl.sh start deepseek-v4-unsloth
+```
+
+每个引擎子目录均提供 **deepseek-v4-flash** 与 **qwen3.8** 两份带注释的示例配置，便于学习各引擎参数。按引擎启动示例：
+
+```bash
+# llamacpp：DeepSeek-V4-Flash（DSpark 投机解码）/ Qwen3.8-27B GGUF
+bash script/modelctl.sh start deepseek-v4-flash-llamacpp
+bash script/modelctl.sh start qwen3.8-llamacpp
+
+# ollama：DeepSeek-V4-Flash / Qwen3.8-27B（ollama pull 自动拉取）
+bash script/modelctl.sh start deepseek-v4-flash-ollama
+bash script/modelctl.sh start qwen3.8-ollama
+
+# vllm：DeepSeek-V4-Flash / Qwen3.8-27B（HF 原始权重）
+bash script/modelctl.sh start deepseek-v4-flash-vllm
+bash script/modelctl.sh start qwen3.8-vllm
+
+# sglang：DeepSeek-V4-Flash / Qwen3.8-27B（HF 原始权重）
+bash script/modelctl.sh start deepseek-v4-flash-sglang
+bash script/modelctl.sh start qwen3.8-sglang
+
+# unsloth：DeepSeek-V4-Flash / Qwen3.8-27B（无头 API，动态量化 GGUF）
+bash script/modelctl.sh start deepseek-v4-flash-unsloth
+bash script/modelctl.sh start qwen3.8-unsloth
 ```
 
 也可直接调用已安装的 `modelctl` 命令：

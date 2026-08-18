@@ -48,19 +48,36 @@ vi .env
 
 ### 1.5 models 目录布局
 
-profile 支持两种存放方式（按引擎分目录为推荐方式，旧的根目录方式仍兼容）：
+profile 支持两种存放方式（按引擎分目录为推荐方式，旧的根目录方式仍兼容）。每个引擎子目录均提供
+**deepseek-v4-flash** 与 **qwen3.8** 两份带注释的示例配置，便于学习各引擎参数：
 
 ```
 models/
 ├── deepseek-v4.yaml            # llamacpp + DSpark（根目录，兼容旧式）
 ├── qwen3-llama.yaml            # llamacpp（根目录）
+├── qwen3-ollama.yaml           # ollama（根目录）
+├── qwen3-vllm.yaml             # vllm（根目录）
 ├── llamacpp/                   # llamacpp 引擎 profile 子目录
-│   └── qwen3-llamacpp.yaml
-├── ollama/                     # ollama 引擎 profile 子目录（预留）
-└── vllm/                       # vllm 引擎 profile 子目录（预留）
+│   ├── deepseek-v4-flash.yaml  # DeepSeek-V4-Flash（llamacpp + DSpark）
+│   ├── qwen3.8.yaml            # Qwen3.8-27B GGUF（llamacpp）
+│   └── qwen3-llamacpp.yaml     # Qwen3.8-27B GGUF（llamacpp，旧式命名）
+├── ollama/                     # ollama 引擎 profile 子目录
+│   ├── deepseek-v4-flash.yaml  # DeepSeek-V4-Flash（ollama）
+│   └── qwen3.8.yaml            # Qwen3.8-27B（ollama）
+├── vllm/                       # vllm 引擎 profile 子目录
+│   ├── deepseek-v4-flash.yaml  # DeepSeek-V4-Flash（vllm）
+│   └── qwen3.8.yaml            # Qwen3.8-27B（vllm）
+├── sglang/                     # sglang 引擎 profile 子目录
+│   ├── deepseek-v4-flash.yaml  # DeepSeek-V4-Flash（sglang）
+│   └── qwen3.8.yaml            # Qwen3.8-27B（sglang）
+└── unsloth/                    # unsloth 引擎 profile 子目录
+    ├── deepseek-v4-flash.yaml  # DeepSeek-V4-Flash（unsloth）
+    ├── qwen3.8.yaml            # Qwen3.8-27B（unsloth）
+    └── deepseek-v4-unsloth.yaml # DeepSeek-V4-Flash（unsloth，旧式命名）
 ```
 
 同一 `name` 同时存在于根目录与子目录时，以根目录为准（`modelctl list` 会打印忽略警告）。
+各引擎 profile 的 `name` 全局唯一，示例配置统一采用 `<model>-<engine>` 命名（如 `deepseek-v4-flash-vllm`）。
 
 ### 2. 按需修改 `models/deepseek-v4.yaml`
 
