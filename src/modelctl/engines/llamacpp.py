@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import shutil
 import subprocess
@@ -14,6 +13,7 @@ from loguru import logger
 
 from modelctl.core.capabilities import free_vram_total_mb
 from modelctl.core.envfile import PROJECT_ROOT
+from modelctl.engines._download import ensure_modelscope
 from modelctl.engines.base import EngineAdapter, RequirementError
 
 OFFICIAL_URL = "https://github.com/ggml-org/llama.cpp.git"
@@ -60,8 +60,7 @@ def download_gguf(modelscope_id: str, model_root: Path, quant: str, want_dspark:
 
     返回 (模型首分片, 草稿路径或 None)。不会下载整个仓库。
     """
-    if importlib.util.find_spec("modelscope") is None:
-        run([sys.executable, "-m", "pip", "install", "-U", "modelscope"])
+    ensure_modelscope()
 
     from modelscope import snapshot_download  # type: ignore[import-not-found]
 
