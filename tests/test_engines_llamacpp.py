@@ -130,3 +130,49 @@ def test_check_requirements_allows_empty_model_with_download(tmp_path):
     adapter = get_adapter("llamacpp")(load_profile("ds", tmp_path), caps)
     adapter.check_requirements()  # 不应抛错
     assert adapter._model is None
+
+
+def test_check_requirements_dspark_intent_with_empty_model(tmp_path):
+    # model 留空 + download 段 + dspark on（默认）：不应静默关闭，dspark 意图保留
+    (tmp_path / "ds.yaml").write_text(
+        "name: ds\nengine: llamacpp\nport: 18888\nllamacpp:\n  model: ''\n  download:\n    modelscope_id: x/y\n    quant: Q4_K_M\n  gpu_count: 8\n  dspark: on\n",
+        encoding="utf-8",
+    )
+    caps = probe(nvidia_smi_output=SMI)
+    adapter = get_adapter("llamacpp")(load_profile("ds", tmp_path), caps)
+    adapter.check_requirements()
+    assert adapter._model is None
+    assert adapter._dspark is True  # 意图保留，下载后重新发现草稿
+    assert not any("未找到" in w for w in adapter.warnings)
+
+
+def test_pre_start_discovers_draft_after_download(tmp_path, monkeypatch):
+    from modelctl.engines import _persist as persist_mod
+    from modelctl.engines import llamacpp
+
+    (tmp_path / "ds.yaml").write_text(
+        f"name: ds\nengine: llamacpp\nport: 18888\nllamacpp:\n  model: ''\n  download:\n    modelscope_id: x/y\n    quant: Q4_K_M\n  gpu_count: 8\n  dspark: on\n  source_dir: {tmp_path / 'llama.cpp'}\n",
+        encoding="utf-8",
+    )
+    caps = probe(nvidia_smi_output=SMI)
+    adapter = get_adapter("llamacpp")(load_profile("ds", tmp_path), caps)
+    adapter.check_requirements()
+    assert adapter._dspark is True
+
+    # 构造下载后的状态：模型分片 + 同目录 dspark 草稿
+    dest = tmp_path / "model-gguf" / "y"
+    dest.mkdir(parents=True)
+    model_shard = dest / "m-Q4_K_M-00001-of-00002.gguf"
+    model_shard.write_bytes(b"x")
+    (dest / "dspark-x.gguf").write_bytes(b"x")
+
+    # download_gguf 只返回模型分片（auto_draft=None），验证走重新发现分支
+    monkeypatch.setattr(llamacpp, "download_gguf", lambda mid, root, quant, wd: (model_shard, None))
+    monkeypatch.setattr(persist_mod, "persist_model_path", lambda *a, **k: None)
+    monkeypatch.setattr(llamacpp, "require", lambda *a, **k: None)
+    monkeypatch.setattr(llamacpp, "run", lambda *a, **k: None)
+
+    adapter.pre_start()
+    assert adapter._draft is not None
+    assert adapter._draft.name == "dspark-x.gguf"
+    assert adapter._dspark is True

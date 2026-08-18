@@ -132,14 +132,21 @@ class LlamaCppAdapter(EngineAdapter):
                 raise RequirementError(f"找不到 GGUF 模型：{self._model}（且未配置 download 段）")
         # DSpark 草稿发现与显存降级
         if str(cfg.get("dspark", "on")).lower() in ("on", "true", "1"):
-            self._draft = self._find_draft(cfg)
-            if self._draft is None:
-                self.warnings.append("未找到 DSpark 草稿模型，已自动关闭 DSpark")
-            elif free_vram_total_mb(self.caps) < 11 * 1024:
-                self.warnings.append("剩余显存不足 ~11GB，已自动关闭 DSpark")
-                self._draft = None
-            else:
-                self._dspark = True
+            if self._model is not None:
+                self._draft = self._find_draft(cfg)
+                if self._draft is None:
+                    self.warnings.append("未找到 DSpark 草稿模型，已自动关闭 DSpark")
+                elif free_vram_total_mb(self.caps) < 11 * 1024:
+                    self.warnings.append("剩余显存不足 ~11GB，已自动关闭 DSpark")
+                    self._draft = None
+                else:
+                    self._dspark = True
+            elif cfg.get("download"):
+                # model 留空 + download 段：先按意图启用，下载后重新发现草稿
+                if free_vram_total_mb(self.caps) < 11 * 1024:
+                    self.warnings.append("剩余显存不足 ~11GB，已自动关闭 DSpark")
+                else:
+                    self._dspark = True
         # 显存预检：模型文件大小 × 1.1
         if self._model and self._model.is_file():
             need_mb = self._model.stat().st_size / 1024 / 1024 * 1.1
@@ -244,6 +251,12 @@ class LlamaCppAdapter(EngineAdapter):
             from modelctl.engines._persist import persist_model_path
 
             persist_model_path(self.profile.path, "llamacpp", str(self._model.resolve()))
+            # model 留空时下载前无法发现草稿，下载后按意图重新发现
+            if self._dspark and self._draft is None:
+                self._draft = self._find_draft(cfg)
+                if self._draft is None:
+                    self.warnings.append("下载完成，但未找到 DSpark 草稿模型，已自动关闭 DSpark")
+                    self._dspark = False
         require("git")
         require("cmake")
         if not source.exists():
