@@ -1,0 +1,23 @@
+name: qwen3
+engine: llamacpp
+port: 8000
+api_key: ${API_KEY}
+
+llamacpp:
+  model: ""
+  download:
+    modelscope_id: unsloth/Qwen3.8-27B-GGUF
+    quant: Q4_K_M
+  parallel: 2
+  ctx_size: 32768
+  reasoning: on
+  reasoning_format: deepseek
+  dspark: off
+  cache_type_k: q8_0
+  cache_type_v: q8_0
+  gpu_count: 2
+  fit: off
+
+usage:
+  price_in: 0.5
+  price_out: 1.0
