@@ -129,7 +129,7 @@ uv run modelctl start deepseek-v4
 curl http://127.0.0.1:18888/health   # deepseek-v4
 curl http://127.0.0.1:11434/         # qwen3-ollama
 curl http://127.0.0.1:8000/health    # qwen3-vllm
-curl http://127.0.0.1:8000/v1/models -H "Authorization: Bearer $UNSLOTH_API_KEY"   # deepseek-v4-unsloth
+curl http://127.0.0.1:8001/v1/models -H "Authorization: Bearer $UNSLOTH_API_KEY"   # deepseek-v4-unsloth
 ```
 
 ### 5. 停止 / 重启 / 状态

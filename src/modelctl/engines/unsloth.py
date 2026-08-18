@@ -80,6 +80,7 @@ class UnslothAdapter(EngineAdapter):
                 "可配置 HF_ENDPOINT=https://hf-mirror.com 后从 Hugging Face 手动下载 "
                 "unsloth GGUF 仓库，并将本地路径填入 unsloth.model。"
             ) from error
+        assert self.profile.path is not None  # 加载的 profile 必有真实文件路径
         persist_model_path(self.profile.path, "unsloth", str(model_match.resolve()))
         cfg["model"] = str(model_match.resolve())
 

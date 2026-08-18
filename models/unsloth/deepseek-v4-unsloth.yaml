@@ -2,7 +2,7 @@
 # 命名避开根目录已有的 deepseek-v4.yaml（llamacpp 引擎，根目录优先）
 name: deepseek-v4-unsloth
 engine: unsloth
-port: 8000
+port: 8001
 api_key: ${UNSLOTH_API_KEY}   # 必填：健康检查 /v1/models 依赖 Bearer 认证
 
 unsloth:
