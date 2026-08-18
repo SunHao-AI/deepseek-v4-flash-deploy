@@ -13,7 +13,7 @@ from loguru import logger
 
 from modelctl.core.capabilities import free_vram_total_mb
 from modelctl.core.envfile import PROJECT_ROOT
-from modelctl.engines._download import download_repo
+from modelctl.engines._download import ensure_modelscope, snapshot_download
 from modelctl.engines.base import EngineAdapter, RequirementError
 
 OFFICIAL_URL = "https://github.com/ggml-org/llama.cpp.git"
@@ -60,13 +60,31 @@ def download_gguf(modelscope_id: str, model_root: Path, quant: str, want_dspark:
 
     返回 (模型首分片, 草稿路径或 None)。不会下载整个仓库。
     """
-    destination = download_repo(modelscope_id, model_root)
+    ensure_modelscope()
+
+    destination = model_root / modelscope_id.rsplit("/", 1)[-1]
+    destination.mkdir(parents=True, exist_ok=True)
 
     patterns = [f"*{quant}*-00001-of-*.gguf", f"*{quant}*.gguf"]
     if want_dspark:
         patterns.extend(DSPARK_PATTERNS)
 
     logger.info(f"从 ModelScope 下载 {modelscope_id} 的 {quant} 分片（{', '.join(patterns)}）：{destination}")
+    try:
+        _snapshot = snapshot_download
+        if _snapshot is None:  # 模块导入时 modelscope 未安装，ensure_modelscope() 之后重导入
+            from modelscope import snapshot_download as _snapshot  # type: ignore[import-not-found]
+        _snapshot(
+            model_id=modelscope_id,
+            local_dir=str(destination),
+            allow_file_pattern=patterns,
+        )
+    except Exception as error:
+        raise RequirementError(
+            f"ModelScope 下载失败。该 GGUF 镜像可能尚未同步 {quant} 分片，或需要登录。\n"
+            f"模型 ID：{modelscope_id}\n"
+            "可尝试指定实际镜像 ID，或从可访问 Hugging Face 的机器下载后配置 model。"
+        ) from error
 
     # ModelScope 保留仓库的 <quant>/ 子目录，分片不一定直接位于 destination 下。
     model_match = _find_first(destination, [f"*{quant}*-00001-of-*.gguf", f"*{quant}*.gguf"])
@@ -222,6 +240,9 @@ class LlamaCppAdapter(EngineAdapter):
             )
             if self._draft is None:
                 self._draft = auto_draft
+            from modelctl.engines._persist import persist_model_path
+
+            persist_model_path(self.profile.path, "llamacpp", str(self._model.resolve()))
         require("git")
         require("cmake")
         if not source.exists():

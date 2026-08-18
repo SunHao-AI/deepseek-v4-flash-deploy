@@ -9,6 +9,13 @@ from pathlib import Path
 
 from loguru import logger
 
+# 模块级可 patch 的引用（方案 D）：测试直接 monkeypatch 本模块属性即可；
+# 未安装 modelscope 时保持 None，调用前由 ensure_modelscope() 安装并延迟重导入。
+try:  # pragma: no cover - 真实环境由 ensure_modelscope 安装
+    from modelscope import snapshot_download  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover
+    snapshot_download = None  # type: ignore[assignment]
+
 
 def ensure_modelscope() -> None:
     """确保 modelscope 已安装，否则自动安装。"""

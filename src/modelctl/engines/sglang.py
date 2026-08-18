@@ -6,7 +6,11 @@ from __future__ import annotations
 import os
 import shlex
 import sys
+from pathlib import Path
 
+from modelctl.core.envfile import PROJECT_ROOT
+from modelctl.engines._download import download_repo
+from modelctl.engines._persist import persist_model_path
 from modelctl.engines.base import EngineAdapter, RequirementError
 
 
@@ -15,11 +19,23 @@ class SglangAdapter(EngineAdapter):
         if not self.caps.binaries.get("sglang"):
             raise RequirementError("未安装 sglang（PATH 中找不到 sglang 命令）")
         cfg = self.profile.engine_config
-        if not cfg.get("model"):
-            raise RequirementError(f"{self.profile.name}：sglang.model 必填")
+        if not cfg.get("model") and not cfg.get("download"):
+            raise RequirementError(f"{self.profile.name}：sglang.model 必填（或配置 download 段自动下载）")
         tp = int(cfg.get("tensor_parallel_size", 1))
         if self.caps.gpu_count and tp > self.caps.gpu_count:
             raise RequirementError(f"tensor_parallel_size={tp} 超过实际 GPU 数 {self.caps.gpu_count}")
+
+    def pre_start(self) -> None:
+        cfg = self.profile.engine_config
+        model = str(cfg.get("model") or "")
+        if model and (Path(model).expanduser().is_dir() or Path(model).expanduser().is_file()):
+            return
+        if cfg.get("download"):
+            modelscope_id = cfg["download"]["modelscope_id"]
+            model_root = Path(os.environ.get("MODEL_ROOT") or PROJECT_ROOT.parent / "model-hf")
+            local_dir = download_repo(modelscope_id, model_root)
+            persist_model_path(self.profile.path, "sglang", str(local_dir.resolve()))
+            cfg["model"] = str(local_dir.resolve())
 
     def build_command(self) -> tuple[list[str], dict[str, str]]:
         cfg = self.profile.engine_config

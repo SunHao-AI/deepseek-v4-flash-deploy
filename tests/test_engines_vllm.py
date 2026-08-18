@@ -61,3 +61,52 @@ def test_vllm_metrics(tmp_path):
     a = get_adapter("vllm")(p, CAPS8)
     assert a.metrics_mapping()["prompt_total"] == ["vllm:prompt_tokens_total"]
     assert a.metrics_mapping()["predicted_total"] == ["vllm:generation_tokens_total"]
+
+
+def test_vllm_requirements_allow_download_only(tmp_path):
+    p = _write(
+        tmp_path,
+        "name: q\nengine: vllm\nport: 8000\nvllm:\n  model: ''\n  download:\n    modelscope_id: Qwen/Qwen3-32B\n",
+    )
+    a = get_adapter("vllm")(p, CAPS8)
+    a.check_requirements()  # model 为空但有 download 段时不应报错
+
+
+def test_vllm_pre_start_downloads_and_persists(tmp_path, monkeypatch):
+    p = _write(
+        tmp_path,
+        "name: q\nengine: vllm\nport: 8000\nvllm:\n  model: ''\n  download:\n    modelscope_id: Qwen/Qwen3-32B\n",
+    )
+    a = get_adapter("vllm")(p, CAPS8)
+
+    downloaded = tmp_path / "model-hf" / "Qwen3-32B"
+    # import 位于 vllm 模块顶部，monkeypatch 模块属性即可生效。
+    monkeypatch.setattr("modelctl.engines.vllm.download_repo", lambda mid, root: downloaded)
+    # 使用真实 persist_model_path，同时验证 YAML 被写回。
+
+    a.pre_start()
+    assert p.engine_config["model"] == str(downloaded.resolve())
+    content = p.path.read_text(encoding="utf-8")
+    assert f"model: {downloaded.resolve()}" in content
+    assert (tmp_path / "m.yaml.bak").is_file()
+
+
+def test_vllm_pre_start_skips_when_model_exists(tmp_path, monkeypatch):
+    p = _write(
+        tmp_path,
+        f"name: q\nengine: vllm\nport: 8000\nvllm:\n  model: {tmp_path}/model-hf/Qwen3-32B\n",
+    )
+    (tmp_path / "model-hf" / "Qwen3-32B").mkdir(parents=True)
+    a = get_adapter("vllm")(p, CAPS8)
+
+    calls = []
+
+    def _fail(*args, **kwargs):  # 不应被调用
+        calls.append("called")
+        return tmp_path
+
+    monkeypatch.setattr("modelctl.engines.vllm.download_repo", _fail)
+    monkeypatch.setattr("modelctl.engines.vllm.persist_model_path", _fail)
+
+    a.pre_start()  # model 路径已存在，直接返回
+    assert calls == []
