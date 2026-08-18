@@ -124,11 +124,12 @@ class LlamaCppAdapter(EngineAdapter):
         if gpu_count > self.caps.gpu_count:
             raise RequirementError(f"profile gpu_count={gpu_count} 超过实际 GPU 数 {self.caps.gpu_count}")
         model = cfg.get("model")
-        if not model:
-            raise RequirementError(f"{self.profile.name}：llamacpp.model 必填")
-        self._model = Path(model).expanduser()
-        if not self._model.is_file() and not cfg.get("download"):
-            raise RequirementError(f"找不到 GGUF 模型：{self._model}（且未配置 download 段）")
+        if not model and not cfg.get("download"):
+            raise RequirementError(f"{self.profile.name}：llamacpp.model 必填（或配置 download 段自动下载）")
+        self._model = Path(model).expanduser() if model else None
+        if not self._model or not self._model.is_file():
+            if not cfg.get("download"):
+                raise RequirementError(f"找不到 GGUF 模型：{self._model}（且未配置 download 段）")
         # DSpark 草稿发现与显存降级
         if str(cfg.get("dspark", "on")).lower() in ("on", "true", "1"):
             self._draft = self._find_draft(cfg)
@@ -140,7 +141,7 @@ class LlamaCppAdapter(EngineAdapter):
             else:
                 self._dspark = True
         # 显存预检：模型文件大小 × 1.1
-        if self._model.is_file():
+        if self._model and self._model.is_file():
             need_mb = self._model.stat().st_size / 1024 / 1024 * 1.1
             if need_mb > free_vram_total_mb(self.caps):
                 raise RequirementError(
@@ -148,7 +149,8 @@ class LlamaCppAdapter(EngineAdapter):
                 )
 
     def _find_draft(self, cfg: dict) -> Path | None:
-        assert self._model is not None  # check_requirements 已设置模型路径
+        if self._model is None:
+            return None
         if cfg.get("draft"):
             p = Path(cfg["draft"]).expanduser()
             return p if p.is_file() else None
@@ -226,13 +228,12 @@ class LlamaCppAdapter(EngineAdapter):
 
     def pre_start(self) -> None:
         cfg = self.profile.engine_config
-        assert self._model is not None  # check_requirements 已确保模型路径存在
         source = (
             Path(cfg.get("source_dir") or os.environ.get("LLAMACPP_SOURCE_DIR") or PROJECT_ROOT.parent / "llama.cpp")
             .expanduser()
             .resolve()
         )
-        if cfg.get("download") and not self._model.is_file():
+        if cfg.get("download") and (self._model is None or not self._model.is_file()):
             dl = cfg["download"]
             model_root = Path(os.environ.get("MODEL_ROOT") or PROJECT_ROOT.parent / "model-gguf")
             self._model, auto_draft = download_gguf(

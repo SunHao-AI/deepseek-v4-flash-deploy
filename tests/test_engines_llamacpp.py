@@ -119,3 +119,14 @@ def test_download_gguf_no_draft(tmp_path, monkeypatch):
     patterns = "|".join(captured["allow_file_pattern"])
     assert "*Q4_K_M*" in patterns
     assert "dspark" not in patterns
+
+
+def test_check_requirements_allows_empty_model_with_download(tmp_path):
+    (tmp_path / "ds.yaml").write_text(
+        "name: ds\nengine: llamacpp\nport: 18888\nllamacpp:\n  model: ''\n  download:\n    modelscope_id: x/y\n    quant: Q4_K_M\n  gpu_count: 8\n",
+        encoding="utf-8",
+    )
+    caps = probe(nvidia_smi_output=SMI)
+    adapter = get_adapter("llamacpp")(load_profile("ds", tmp_path), caps)
+    adapter.check_requirements()  # 不应抛错
+    assert adapter._model is None
