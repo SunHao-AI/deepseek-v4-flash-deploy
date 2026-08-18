@@ -68,3 +68,34 @@ def test_metrics_mapping_keys(tmp_path):
 def test_unknown_engine():
     with pytest.raises(ProfileError):
         get_adapter("tensorrt")
+
+
+def test_download_gguf(tmp_path, monkeypatch):
+    from modelctl.engines import llamacpp
+
+    dest = tmp_path / "Qwen3.8-27B-GGUF"
+    dest.mkdir(parents=True)
+    (dest / "qwen3-Q4_K_M-00001-of-00002.gguf").write_bytes(b"x")
+    (dest / "dspark-DeepSeek-V4-Flash-0731-Q8_0.gguf").write_bytes(b"x")
+
+    # 模块级 monkeypatch download_repo，避免依赖真实 modelscope 安装。
+    monkeypatch.setattr(llamacpp, "download_repo", lambda mid, root: dest)
+
+    model, draft = llamacpp.download_gguf("unsloth/Qwen3.8-27B-GGUF", tmp_path, "Q4_K_M", True)
+    assert model.name == "qwen3-Q4_K_M-00001-of-00002.gguf"
+    assert draft is not None
+    assert draft.name == "dspark-DeepSeek-V4-Flash-0731-Q8_0.gguf"
+
+
+def test_download_gguf_no_draft(tmp_path, monkeypatch):
+    from modelctl.engines import llamacpp
+
+    dest = tmp_path / "Qwen3.8-27B-GGUF"
+    dest.mkdir(parents=True)
+    (dest / "qwen3-Q4_K_M-00001-of-00002.gguf").write_bytes(b"x")
+
+    monkeypatch.setattr(llamacpp, "download_repo", lambda mid, root: dest)
+
+    model, draft = llamacpp.download_gguf("unsloth/Qwen3.8-27B-GGUF", tmp_path, "Q4_K_M", False)
+    assert model.name == "qwen3-Q4_K_M-00001-of-00002.gguf"
+    assert draft is None
