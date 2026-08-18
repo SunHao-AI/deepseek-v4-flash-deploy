@@ -213,3 +213,26 @@ tail -f ${LOG_DIR}/llama-server-18888-*.log
   cmake --build ${LLAMACPP_SOURCE_DIR}/build --config Release -j
   ```
 - **换 Q4 近无损量化**：如果显存吃紧或想加快加载，把 `models/deepseek-v4.yaml` 的 `model` 改为 `UD-Q4_K_XL/` 路径，分片约小 7GB
+
+## Unsloth 引擎（实验性）
+
+基于 Unsloth 无头 API 服务（`unsloth studio --api-only`）部署 Unsloth 动态量化 GGUF 模型。
+
+### 前置条件
+
+- 在目标服务器安装 Unsloth：`curl -fsSL https://unsloth.ai/install.sh | sh`（或独立 venv 安装，避免重依赖污染项目环境）
+- `.env` 配置 `UNSLOTH_API_KEY`（必填，健康检查依赖）、可选 `HF_ENDPOINT`（HF 兜底镜像）、复用 `MODEL_ROOT`/`MODELSCOPE_CACHE`
+- 启动前用 `unsloth --help` 核实无头服务 flag（`--api-only`、`--model`、`-p` 等），与本工具内置常量不一致时需调整 `engines/unsloth.py`
+
+### 使用
+
+```bash
+bash script/modelctl.sh start deepseek-v4-unsloth   # 首次自动从 ModelScope 下载并写回 profile
+curl http://127.0.0.1:8000/v1/models -H "Authorization: Bearer $UNSLOTH_API_KEY"
+bash script/modelctl.sh status
+```
+
+### 已知限制
+
+- 用量统计暂不支持精确统计（`/metrics` 端点未验证，`modelctl stats` 对该模型返回"不支持精确统计"）
+- 健康检查使用 `/v1/models`（需认证），非 `/health`

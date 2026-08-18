@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shlex
+import urllib.request
 from pathlib import Path
 
 from modelctl.core.capabilities import free_vram_total_mb
@@ -102,6 +104,22 @@ class UnslothAdapter(EngineAdapter):
 
     def metrics_mapping(self) -> None:
         return None
+
+    def post_start(self) -> None:
+        """预热：向 OpenAI 兼容端点发一个最小请求，降低首个请求冷启动延迟；失败不阻塞启动。"""
+        body = json.dumps({"model": "default", "messages": [{"role": "user", "content": "ping"}]}).encode()
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.profile.port}/v1/chat/completions",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.profile.api_key}",
+            },
+        )
+        try:
+            urllib.request.urlopen(req, timeout=60).read()
+        except OSError:
+            pass  # 预热失败不影响启动结果
 
     def stop_patterns(self) -> list[str]:
         return ["unsloth"]

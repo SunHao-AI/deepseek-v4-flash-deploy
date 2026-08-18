@@ -1,5 +1,7 @@
 """tests/test_engines_unsloth.py — Unsloth 适配器测试。"""
 
+import json as _json
+
 import pytest
 
 from modelctl.core.capabilities import Capabilities
@@ -151,3 +153,37 @@ def test_unsloth_pre_start_download_failure_hints_hf(tmp_path, monkeypatch):
     monkeypatch.setattr("modelctl.engines.unsloth.download_gguf", _fail)
     with pytest.raises(RequirementError, match="HF_ENDPOINT"):
         a.pre_start()
+
+
+def test_unsloth_post_start_sends_chat_request(tmp_path, monkeypatch):
+    p = _write(tmp_path, "name: u\nengine: unsloth\nport: 30000\napi_key: k\nunsloth:\n  model: m\n")
+    a = get_adapter("unsloth")(p, CAPS8)
+    seen = {}
+
+    class _Resp:
+        def read(self):
+            return b"{}"
+
+    def _fake(req, timeout):
+        seen["url"] = req.full_url
+        seen["auth"] = req.get_header("Authorization")
+        seen["body"] = _json.loads(req.data)
+        return _Resp()
+
+    monkeypatch.setattr("modelctl.engines.unsloth.urllib.request.urlopen", _fake)
+
+    a.post_start()
+    assert seen["url"] == "http://127.0.0.1:30000/v1/chat/completions"
+    assert seen["auth"] == "Bearer k"
+    assert seen["body"]["messages"][0]["content"] == "ping"
+
+
+def test_unsloth_post_start_ignores_errors(tmp_path, monkeypatch):
+    p = _write(tmp_path, "name: u\nengine: unsloth\nport: 30000\napi_key: k\nunsloth:\n  model: m\n")
+    a = get_adapter("unsloth")(p, CAPS8)
+
+    def _boom(*args, **kwargs):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr("modelctl.engines.unsloth.urllib.request.urlopen", _boom)
+    a.post_start()  # 预热失败不应抛异常

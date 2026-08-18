@@ -1,10 +1,10 @@
 # modelctl — 多模型部署启动器
 
-在 CUDA/Ada GPU 上通过**引擎插件式架构**启动多种模型服务（llamacpp / ollama / vllm / sglang），每模型一个 YAML profile，统一 CLI 管理启动、停止、重启、状态与用量统计。
+在 CUDA/Ada GPU 上通过**引擎插件式架构**启动多种模型服务（llamacpp / ollama / vllm / sglang / unsloth），每模型一个 YAML profile，统一 CLI 管理启动、停止、重启、状态与用量统计。
 
 ## 特性
 
-- **多引擎支持**：llamacpp（官方 llama.cpp + DSpark 投机解码）、ollama、vllm、sglang
+- **多引擎支持**：llamacpp（官方 llama.cpp + DSpark 投机解码）、ollama、vllm、sglang、unsloth（无头 API 服务，Unsloth 动态量化 GGUF）
 - **YAML profile**：每模型一个 YAML（`models/<engine>/<name>.yaml` 或兼容旧式 `models/<name>.yaml`），配置模型路径、端口、引擎参数、用量单价
 - **自动下载**：model 为空/不存在时从 ModelScope 自动下载，并把本地路径持久化写回 YAML（备份 .yaml.bak）
 - **能力探测与自动降级**：启动前探测 GPU/CC/显存/引擎二进制，硬性不满足拒绝启动并说明原因，可降级项自动降级并告警
@@ -34,6 +34,8 @@ deepseek-v4-flash/
 │   ├── llamacpp/                   # llamacpp 引擎 profile 子目录
 │   │   └── qwen3-llamacpp.yaml     # Qwen3.8-27B GGUF（llamacpp）
 │   ├── ollama/                     # ollama 引擎 profile 子目录（预留）
+│   ├── unsloth/                    # unsloth 引擎 profile 子目录
+│   │   └── deepseek-v4-unsloth.yaml
 │   └── vllm/                       # vllm 引擎 profile 子目录（预留）
 ├── .env.example                    # 全局配置模板（复制为 .env 后修改）
 ├── .env                            # 本地配置（含密钥，不入库）
@@ -75,6 +77,7 @@ vi .env        # 修改 API 密钥、存储目录、日志目录等全局配置
 > | `deepseek-v4` / `qwen3-llama` / `qwen3-llamacpp` | `MODEL_ROOT`（GGUF 保存父目录）、`MODELSCOPE_CACHE` |
 > | `qwen3-ollama` | `OLLAMA_MODELS` |
 > | `qwen3-vllm` | `MODEL_ROOT`（ModelScope 下载目录）、`HF_HOME`（vLLM 缓存） |
+> | `deepseek-v4-unsloth` | `UNSLOTH_API_KEY`（必填）、`HF_ENDPOINT`（HF 兜底镜像）、`MODEL_ROOT`（ModelScope 下载） |
 
 ### 2.5 模型自动下载
 
@@ -108,6 +111,10 @@ bash script/modelctl.sh start qwen3-vllm
 # 启动 Qwen3.8-27B GGUF（llamacpp，首次运行自动编译 llama.cpp + 从 ModelScope 下载模型）
 # 模型会下载到 .env 中 MODEL_ROOT 指定的位置，下载后路径自动写回 profile YAML
 bash script/modelctl.sh start qwen3-llamacpp
+
+# 启动 DeepSeek-V4-Flash（unsloth 无头 API，Unsloth 动态量化 GGUF）
+# 模型从 ModelScope 下载并写回 profile；api_key 取 .env 中 UNSLOTH_API_KEY
+bash script/modelctl.sh start deepseek-v4-unsloth
 ```
 
 也可直接调用已安装的 `modelctl` 命令：
@@ -122,6 +129,7 @@ uv run modelctl start deepseek-v4
 curl http://127.0.0.1:18888/health   # deepseek-v4
 curl http://127.0.0.1:11434/         # qwen3-ollama
 curl http://127.0.0.1:8000/health    # qwen3-vllm
+curl http://127.0.0.1:8000/v1/models -H "Authorization: Bearer $UNSLOTH_API_KEY"   # deepseek-v4-unsloth
 ```
 
 ### 5. 停止 / 重启 / 状态
