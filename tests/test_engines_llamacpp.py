@@ -57,6 +57,44 @@ def test_gpu_count_exceeds_hw(tmp_path):
         adapter.check_requirements()
 
 
+def test_sampling_params_passthrough(tmp_path):
+    caps = probe(nvidia_smi_output=SMI)
+    extra = (
+        "  repeat_penalty: 1.1\n  repeat_last_n: 256\n  temperature: 0.6\n"
+        "  top_p: 0.95\n  top_k: 40\n  stops:\n    - '<｜DSML｜tool_calls'\n"
+    )
+    adapter = get_adapter("llamacpp")(_profile(tmp_path, extra=extra), caps)
+    adapter.check_requirements()
+    cmd, _ = adapter.build_command()
+    assert cmd[cmd.index("--repeat-penalty") + 1] == "1.1"
+    assert cmd[cmd.index("--repeat-last-n") + 1] == "256"
+    assert cmd[cmd.index("--temp") + 1] == "0.6"
+    assert cmd[cmd.index("--top-p") + 1] == "0.95"
+    assert cmd[cmd.index("--top-k") + 1] == "40"
+    assert cmd[cmd.index("--stops") + 1] == "<｜DSML｜tool_calls"
+
+
+def test_sampling_params_absent_by_default(tmp_path):
+    caps = probe(nvidia_smi_output=SMI)
+    adapter = get_adapter("llamacpp")(_profile(tmp_path), caps)
+    adapter.check_requirements()
+    cmd, _ = adapter.build_command()
+    assert "--temp" not in cmd
+    assert "--top-p" not in cmd
+    assert "--top-k" not in cmd
+    assert "--repeat-penalty" not in cmd
+    assert "--stops" not in cmd
+
+
+def test_temperature_zero_is_respected(tmp_path):
+    # temperature=0 是合法值（贪心），不能因 falsy 判断被吞掉
+    caps = probe(nvidia_smi_output=SMI)
+    adapter = get_adapter("llamacpp")(_profile(tmp_path, extra="  temperature: 0\n"), caps)
+    adapter.check_requirements()
+    cmd, _ = adapter.build_command()
+    assert cmd[cmd.index("--temp") + 1] == "0"
+
+
 def test_metrics_mapping_keys(tmp_path):
     caps = probe(nvidia_smi_output=SMI)
     adapter = get_adapter("llamacpp")(_profile(tmp_path), caps)

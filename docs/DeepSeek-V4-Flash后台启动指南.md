@@ -236,3 +236,32 @@ bash script/modelctl.sh status
 
 - 用量统计暂不支持精确统计（`/metrics` 端点未验证，`modelctl stats` 对该模型返回"不支持精确统计"）
 - 健康检查使用 `/v1/models`（需认证），非 `/health`
+
+## 采样参数与重复输出排查
+
+llamacpp 部署的 DeepSeek-V4 在推理/工具调用场景可能偶发**重复输出**（如 `<｜DSML｜tool_calls` 反复生成、整段文本循环复制）。主要原因：llama.cpp 默认 `repeat-penalty=1.0`（无重复惩罚），且采样参数未显式配置。本工具已在 `models/deepseek-v4.yaml` 提供采样配置：
+
+```yaml
+llamacpp:
+  repeat_penalty: 1.1      # 重复惩罚（1.0=关闭；1.05~1.15 可有效中断循环）
+  repeat_last_n: 256       # 对最后 N 个 token 施加重复惩罚
+  temperature: 0.6         # 采样温度（0=贪心，易重复；建议 0.6~0.8）
+  top_p: 0.95              # 核采样阈值
+  top_k: 40                # 候选 token 数
+  # stops: ['<｜DSML｜tool_calls']   # 可选：额外停止序列（高级调优）
+```
+
+- 这些字段**均为可选**，缺省时适配器不传参，保持 llama.cpp 默认行为（向后兼容）
+- `temperature` 传 `0` 是合法值（贪心模式），会被正确传递
+- `stops` 为字符串列表，透传为 llama-server 的 `--stops` 参数；**谨慎使用**——若把 `<｜DSML｜tool_calls` 设为停止符，模型将无法完整输出工具调用，仅在确认截断不影响功能时使用
+- 调参建议：先只加 `repeat_penalty: 1.1` + `repeat_last_n: 256` 验证效果；仍循环再降 `temperature`；仍有问题再考虑 `top_p`/`top_k`
+- 其他 llama.cpp profile（如 `qwen3-llamacpp`）同样支持这些字段
+
+### 其他引擎的采样参数位置
+
+| 引擎 | 服务端采样参数 | 说明 |
+|---|---|---|
+| llamacpp | profile `llamacpp:` 段（本工具透传） | 见上文 |
+| unsloth | Unsloth 对 GGUF 自动调参（temp/top-k 自动推理） | 无头 CLI 采样 flag 未验证，不额外透传；可按需通过 API 请求体覆盖 |
+| ollama | Modelfile / API 请求级 | `ollama serve` 默认已有 `repeat_penalty 1.1 / top_k 40 / top_p 0.9` 合理默认，一般无需处理 |
+| vllm / sglang | API 请求级（OpenAI 兼容 `temperature`/`repetition_penalty` 等） | serve 启动不支持服务端采样默认；由调用方在请求体传入 |

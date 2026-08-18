@@ -212,8 +212,20 @@ class LlamaCppAdapter(EngineAdapter):
             "--metrics",
         ]
         cmd += self.api_key_args()
+        # 采样参数透传：缓解重复输出/贪心采样。llama.cpp 默认 repeat-penalty=1.0（无重复惩罚），
+        # DeepSeek 推理/工具调用场景易循环输出，建议 profile 显式配置。均为可选，缺省不传。
         if cfg.get("repeat_penalty"):
             cmd += ["--repeat-penalty", str(cfg["repeat_penalty"])]
+        if cfg.get("repeat_last_n"):
+            cmd += ["--repeat-last-n", str(cfg["repeat_last_n"])]
+        if cfg.get("temperature") is not None:
+            cmd += ["--temp", str(cfg["temperature"])]
+        if cfg.get("top_p") is not None:
+            cmd += ["--top-p", str(cfg["top_p"])]
+        if cfg.get("top_k"):
+            cmd += ["--top-k", str(cfg["top_k"])]
+        for stop in cfg.get("stops") or []:
+            cmd += ["--stops", str(stop)]
         if self._dspark and self._draft is not None:
             cmd += [
                 "--model-draft",

@@ -33,6 +33,16 @@ llamacpp:
   # cache_type_k / cache_type_v：KV cache 量化类型，降低显存占用（q8_0/f16 等）
   cache_type_k: q8_0
   cache_type_v: q8_0
+  # ---- 采样参数（缓解重复输出）----
+  # llama.cpp 默认 repeat-penalty=1.0（无重复惩罚），DeepSeek 推理/工具调用场景
+  # 易出现 <｜DSML｜tool_calls> 或整段文本循环输出，建议显式开启。均为可选，缺省不传。
+  repeat_penalty: 1.1      # 重复惩罚（1.0=关闭；1.05~1.15 可有效中断循环）
+  repeat_last_n: 256       # 对最后 N 个 token 施加重复惩罚
+  temperature: 0.6         # 采样温度（0=贪心，易重复；建议 0.6~0.8）
+  top_p: 0.95              # 核采样阈值
+  top_k: 40                # 候选 token 数
+  # stops: []              # 可选：额外停止序列（如 '<｜DSML｜tool_calls'），
+  #                        # 高级调优用，谨慎设置以免截断正常工具调用
   # gpu_count：实际参与推理的 GPU 数量，决定 --tensor-split 分片
   gpu_count: 8
   # fit：llama.cpp 显存适配策略（on/off）
