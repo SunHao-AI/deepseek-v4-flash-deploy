@@ -228,7 +228,7 @@ tail -f ${LOG_DIR}/llama-server-18888-*.log
 
 ```bash
 bash script/modelctl.sh start deepseek-v4-unsloth   # 首次自动从 ModelScope 下载并写回 profile
-curl http://127.0.0.1:8000/v1/models -H "Authorization: Bearer $UNSLOTH_API_KEY"
+curl http://127.0.0.1:8001/v1/models -H "Authorization: Bearer $UNSLOTH_API_KEY"
 bash script/modelctl.sh status
 ```
 
