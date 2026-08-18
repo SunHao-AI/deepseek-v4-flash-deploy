@@ -3,7 +3,6 @@
 在远程服务器（8× RTX 5880 Ada）上部署 DeepSeek-V4-Flash-0731（官方 llama.cpp + DSpark）的完整说明。工程化改造后，统一使用 `modelctl` CLI 管理生命周期，配置分层为：
 
 - **全局配置**：项目根 `.env`（API 密钥、模型存储目录、日志目录、llama.cpp 源码目录、用量统计服务）
-- **模型级配置**：`models/deepseek-v4.yaml`（模型路径、端口、并行度、量化、DSpark 参数、下载配置、用量单价）
 - **模型级配置**：`models/<engine>/<name>.yaml` 或兼容旧式 `models/<name>.yaml`（模型路径、端口、并行度、量化、DSpark 参数、下载配置、用量单价）
 
 配置优先级：**profile YAML > 环境变量 > .env 文件 > 代码默认值**。
