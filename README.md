@@ -5,7 +5,8 @@
 ## 特性
 
 - **多引擎支持**：llamacpp（官方 llama.cpp + DSpark 投机解码）、ollama、vllm、sglang
-- **YAML profile**：每模型一个 `models/<name>.yaml`，配置模型路径、端口、引擎参数、用量单价
+- **YAML profile**：每模型一个 YAML（`models/<engine>/<name>.yaml` 或兼容旧式 `models/<name>.yaml`），配置模型路径、端口、引擎参数、用量单价
+- **自动下载**：model 为空/不存在时从 ModelScope 自动下载，并把本地路径持久化写回 YAML（备份 .yaml.bak）
 - **能力探测与自动降级**：启动前探测 GPU/CC/显存/引擎二进制，硬性不满足拒绝启动并说明原因，可降级项自动降级并告警
 - **统一生命周期**：后台启动、PID 管理、健康检查、优雅停止
 - **用量统计**：`/api/usage` 输出与 cc-switch 兼容，支持多模型按 `?model=` 路由
@@ -29,7 +30,13 @@ deepseek-v4-flash/
 ├── models/                         # 模型 profile（每模型一个 YAML）
 │   ├── deepseek-v4.yaml            # DeepSeek-V4-Flash（llamacpp + DSpark）
 │   ├── qwen3-ollama.yaml           # Qwen3-32B（ollama）
-│   └── qwen3-vllm.yaml             # Qwen3-32B（vllm）
+│   ├── qwen3-vllm.yaml             # Qwen3-32B（vllm）
+│   ├── llamacpp/                   # llamacpp 引擎 profile 子目录
+│   │   └── qwen3-llamacpp.yaml     # Qwen3.8-27B GGUF（llamacpp）
+│   ├── ollama/                     # ollama 引擎 profile 子目录
+│   │   └── qwen3-ollama.yaml       # Qwen3-32B（ollama，示例）
+│   └── vllm/                       # vllm 引擎 profile 子目录
+│       └── qwen3-vllm.yaml         # Qwen3-32B（vllm，示例）
 ├── .env.example                    # 全局配置模板（复制为 .env 后修改）
 ├── .env                            # 本地配置（含密钥，不入库）
 ├── .gitignore
@@ -59,20 +66,50 @@ vi .env        # 修改 API 密钥、存储目录、日志目录等全局配置
 ```
 
 模型级配置（模型路径、端口、并行度、量化等）在 `models/*.yaml` 中修改。
+推荐按引擎放入子目录 `models/<engine>/<name>.yaml`；旧的根目录 `models/<name>.yaml` 仍兼容（同名时根目录优先）。
 
 配置优先级：**profile YAML > 环境变量 > .env 文件 > 代码默认值**。
+
+> 首次启动前，请务必在 `.env` 中设置模型存储目录，否则下载/缓存位置会回退到代码默认值（可能落在项目根目录或当前盘符）：
+>
+> | profile | 控制下载/缓存位置的环境变量 |
+> |---------|----------------------------|
+> | `deepseek-v4` / `qwen3-llama` / `qwen3-llamacpp` | `MODEL_ROOT`（GGUF 保存父目录）、`MODELSCOPE_CACHE` |
+> | `qwen3-ollama` | `OLLAMA_MODELS` |
+> | `qwen3-vllm` | `MODEL_ROOT`（ModelScope 下载目录）、`HF_HOME`（vLLM 缓存） |
+
+### 2.5 模型自动下载
+
+profile 的 `model` 字段为空或指向的文件/目录不存在时，若配置了 `download` 段，启动时自动从
+ModelScope 下载模型：
+
+- **llamacpp**：`download.modelscope_id`（GGUF 仓库）+ `download.quant`（量化名），只下载指定量化分片
+- **vllm / sglang**：`download.modelscope_id`（HF 格式仓库），下载整个仓库目录
+- **ollama**：无需 download 段，由 `ollama pull` 自动处理
+
+下载成功后，本地路径会**持久化写回** profile YAML 的 `model` 字段（原文件备份为 `.yaml.bak`），
+下次启动直接复用本地模型，无需重复下载。
+
+环境变量 `MODEL_ROOT` 控制下载目录（默认：项目根目录上级的 `model-gguf/` 或 `model-hf/`）。
 
 ### 3. 启动服务
 
 ```bash
 # 启动 DeepSeek-V4-Flash（llamacpp，首次运行会自动编译 llama.cpp 并下载模型）
+# 模型会下载到 .env 中 MODEL_ROOT / MODELSCOPE_CACHE 指定的位置
 bash script/modelctl.sh start deepseek-v4
 
 # 启动 Qwen3（ollama）
+# 模型会下载到 .env 中 OLLAMA_MODELS 指定的位置
 bash script/modelctl.sh start qwen3-ollama
 
 # 启动 Qwen3（vllm）
+# 模型会下载到 .env 中 HF_HOME 指定的位置
 bash script/modelctl.sh start qwen3-vllm
+
+# 启动 Qwen3.8-27B GGUF（llamacpp，首次运行自动编译 llama.cpp + 从 ModelScope 下载模型）
+# 模型会下载到 .env 中 MODEL_ROOT 指定的位置，下载后路径自动写回 profile YAML
+bash script/modelctl.sh start qwen3-llamacpp
 ```
 
 也可直接调用已安装的 `modelctl` 命令：
